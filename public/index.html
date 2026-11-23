@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04110f">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23061b19' stroke='%23f2b53f' stroke-width='4'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial,sans-serif' font-weight='900' font-size='26' fill='%23f2b53f'%3EFN%3C/text%3E%3C/svg%3E">
+<title>FatoNexo Studio · Central de Criação</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-script" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2v6M15 2v6"/><path d="M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21 12-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.3-8.3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 3v4M17 5h4M5 17v4M3 19h4"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></symbol>
+    <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l4 4v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v6h8V3M7 21v-7h10v7"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.7"/><path d="m21 16-5-5-9 9"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m7 4 13 8-13 8z"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></symbol>
+    <symbol id="i-arrow-r" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></symbol>
+    <symbol id="i-arrow-l" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="rail" id="rail">
+    <a class="rail-brand" href="#canal" aria-label="FatoNexo Studio">
+      <span class="logo-ring"><img id="brand-avatar" alt="Logo FatoNexo" hidden><b id="brand-fallback">FN</b></span>
+      <span class="rail-brand-text"><strong>FATO<em>NEXO</em></strong><small>Studio · @fatonexocuri</small></span>
+    </a>
+    <nav class="workspace-nav" aria-label="Áreas do painel">
+      <a href="#canal" aria-current="page"><svg class="ic"><use href="#i-dashboard"/></svg><span>Dashboard</span></a>
+      <a href="#pesquisa"><svg class="ic"><use href="#i-search"/></svg><span>Pesquisa</span></a>
+      <a href="#chat"><svg class="ic"><use href="#i-chat"/></svg><span>Chat IA</span></a>
+      <a href="#producao"><svg class="ic"><use href="#i-script"/></svg><span>Roteiro</span></a>
+      <a href="#estrategia"><svg class="ic"><use href="#i-compass"/></svg><span>Estratégia</span></a>
+      <a href="#metas"><svg class="ic"><use href="#i-target"/></svg><span>Metas</span></a>
+      <a href="#historico"><svg class="ic"><use href="#i-clock"/></svg><span>Histórico</span></a>
+      <a href="#integracoes"><svg class="ic"><use href="#i-plug"/></svg><span>Integrações</span></a>
+    </nav>
+    <div class="rail-foot">
+      <div class="rail-live" id="rail-live"><span class="live-dot"></span><span id="rail-live-text">Conectando ao monitor…</span></div>
+    </div>
+  </aside>
+
+  <div class="stage">
+    <header class="topbar">
+      <div class="topbar-title">
+        <span class="eyebrow">FatoNexo Studio</span>
+        <h1 id="page-title">Dashboard</h1>
+      </div>
+      <label class="model-picker" title="Modelo usado pelo Direcionador IA">
+        <svg class="ic"><use href="#i-sparkles"/></svg>
+        <select id="global-model" aria-label="Modelo do Direcionador IA">
+          <option value="opencode/mimo-v2.6-flash-free">MiMo-V2.6-Flash · Free</option>
+          <option value="opencode-go/mimo-v2.6-flash">MiMo-V2.6-Flash · Go</option>
+        </select>
+      </label>
+    </header>
+
+    <main class="workspace">
+
+<!-- ============================ DASHBOARD ============================ -->
+<section id="canal" class="workspace-view" data-workspace aria-label="Dashboard">
+  <article class="card hero-card">
+    <div class="hero-id">
+      <span class="avatar-ring"><img id="channel-hero-avatar" class="channel-avatar xl" alt="@fatonexocuri" hidden><b id="hero-fallback">FN</b></span>
+      <div>
+        <h2 id="hero-title">FatoNexo</h2>
+        <p class="meta" id="hero-handle">@fatonexocuri</p>
+        <div class="hero-live">
+          <span class="live-pill"><span class="live-dot"></span>AO VIVO</span>
+          <span class="meta" id="channel-status" role="status">Conectando ao monitor…</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <button class="ghost" type="button" id="btn-channel"><svg class="ic"><use href="#i-refresh"/></svg>Atualizar agora</button>
+      <a class="ghost" href="https://www.youtube.com/@fatonexocuri/shorts" target="_blank" rel="noopener"><svg class="ic"><use href="#i-ext"/></svg>Abrir canal</a>
+      <button class="primary" type="button" id="btn-channel-ai"><svg class="ic"><use href="#i-sparkles"/></svg>Análise IA</button>
+    </div>
+    <div class="live-bar-wrap" title="Próxima leitura automática do YouTube"><i id="live-bar"></i></div>
+  </article>
+
+  <div class="kpi-grid" id="channel-summary"></div>
+
+  <div class="dash-grid">
+    <article class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h3>Crescimento em tempo real</h3>
+          <p class="meta" id="chart-sub">Aguardando as primeiras leituras…</p>
+        </div>
+        <div class="chart-tools">
+          <div class="seg" id="chart-metric" role="tablist" aria-label="Métrica do gráfico">
+            <button type="button" data-m="views" class="active">Views</button>
+            <button type="button" data-m="subs">Inscritos</button>
+            <button type="button" data-m="avg">Média/Short</button>
+          </div>
+          <div class="seg" id="chart-range" role="tablist" aria-label="Período do gráfico">
+            <button type="button" data-r="1h">1h</button>
+            <button type="button" data-r="24h">24h</button>
+            <button type="button" data-r="all" class="active">Tudo</button>
+          </div>
+        </div>
+      </div>
+      <div id="channel-chart-wrap" class="chart-area"></div>
+      <p class="meta foot-note">Dados públicos do YouTube lidos a cada 30 s e gravados enquanto o Studio estiver ligado. O YouTube pode demorar alguns minutos para refletir novas views e arredonda inscritos acima de mil.</p>
+    </article>
+
+    <aside class="dash-side">
+      <article class="card">
+        <div class="card-head"><h3>Meta de entrada YPP</h3><a class="link" href="#metas" data-goto="metas">Ver metas</a></div>
+        <div id="goal-progress"></div>
+      </article>
+      <article class="card">
+        <div class="card-head"><h3>Atividade ao vivo</h3><span class="meta" id="feed-count"></span></div>
+        <div id="live-feed" class="feed"></div>
+      </article>
+    </aside>
+  </div>
+
+  <article class="card ai-card" id="channel-ai-card">
+    <div class="card-head">
+      <div>
+        <h3><svg class="ic gold"><use href="#i-sparkles"/></svg> Análise gerada por IA</h3>
+        <p class="meta" id="ai-pulse-meta">A IA lê os números ao vivo e sugere a próxima ação.</p>
+      </div>
+      <button class="ghost" type="button" id="btn-chat-about"><svg class="ic"><use href="#i-chat"/></svg>Conversar sobre isso</button>
+    </div>
+    <div id="channel-ai-pulse" class="ai-pulse-box md"></div>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><h3>Shorts do canal</h3><span class="meta" id="shorts-count"></span></div>
+    <div id="channel-shorts" class="short-grid"></div>
+  </article>
+</section>
+
+<!-- ============================ PESQUISA ============================ -->
+<section id="pesquisa" class="workspace-view" data-workspace aria-label="Pesquisa" hidden>
+  <article class="card search-hero">
+    <div class="search-hero-text">
+      <h2>Encontre canais e Shorts que estão crescendo</h2>
+      <p class="meta">A IA cria as buscas, o painel lê o YouTube de verdade e salva tudo no Histórico para você consultar depois.</p>
+    </div>
+    <form id="youtube-search" class="search-form">
+      <div class="search-box">
+        <svg class="ic"><use href="#i-search"/></svg>
+        <input name="q" required maxlength="240" value="curiosidades que parecem mentira" placeholder="Nicho, assunto ou objetivo — ex.: canais pequenos de ciência viralizando">
+        <button class="primary" type="submit" id="btn-ai-search"><svg class="ic"><use href="#i-sparkles"/></svg><span>Buscar com IA</span></button>
+      </div>
+      <div class="filters">
+        <label>Tipo
+          <select name="type">
+            <option value="video">Shorts</option>
+            <option value="channel">Canais</option>
+          </select>
+        </label>
+        <label id="channel-filter-wrap" hidden>Perfil do canal
+          <select name="channelFilter">
+            <option value="all">Todos</option>
+            <option value="monetized">Já monetizáveis (1.000+)</option>
+            <option value="entry">Meta inicial (500+)</option>
+            <option value="growing">Em crescimento (500–50 mil)</option>
+            <option value="micro">Iniciando (&lt; 1.000)</option>
+          </select>
+        </label>
+        <label>Período
+          <select name="days">
+            <option value="7">7 dias</option>
+            <option value="30" selected>30 dias</option>
+            <option value="90">90 dias</option>
+          </select>
+        </label>
+        <label>Ordenar
+          <select name="order">
+            <option value="relevance">Relevância</option>
+            <option value="date">Recentes</option>
+            <option value="viewCount">Mais vistos</option>
+          </select>
+        </label>
+        <div class="filters-actions">
+          <button class="ghost" type="button" id="btn-direct-search"><svg class="ic"><use href="#i-zap"/></svg>Busca direta</button>
+          <button class="ghost" type="button" id="open-youtube-search"><svg class="ic"><use href="#i-ext"/></svg>YouTube</button>
+          <button class="ghost" type="button" id="btn-open-analyzer"><svg class="ic"><use href="#i-film"/></svg>Analisar link</button>
+        </div>
+      </div>
+    </form>
+    <div id="recent-searches-bar" class="history-chips" hidden></div>
+  </article>
+
+  <article class="card" id="ai-brief-card" hidden>
+    <div class="card-head">
+      <h3><svg class="ic gold"><use href="#i-sparkles"/></svg> Diagnóstico do Direcionador</h3>
+      <span class="meta" id="ai-brief-model"></span>
+    </div>
+    <p id="ai-brief-summary" class="lead"></p>
+    <p class="meta" id="ai-brief-queries"></p>
+    <div id="ai-brief-highlights" class="strategy-list"></div>
+    <div id="ai-next-queries" class="history-chips"></div>
+  </article>
+
+  <article class="card">
+    <div class="card-head"><h3>Resultados</h3><span class="meta" id="search-status" role="status">Faça uma busca para ver canais, capas e visualizações.</span></div>
+    <div id="search-results" class="results-grid"></div>
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <h3><svg class="ic gold"><use href="#i-bookmark"/></svg> Referências salvas</h3>
+    </div>
+    <details id="reference-editor" class="fold">
+      <summary><svg class="ic"><use href="#i-plus"/></svg>Adicionar referência manual</summary>
+      <form id="reference-form" class="stack-form">
+        <div class="row">
+          <label>Tipo<select name="type"><option value="video">Vídeo</option><option value="channel">Canal</option></select></label>
+          <label>Título ou nome<input name="title" required maxlength="180"></label>
+        </div>
+        <label>Link do YouTube<input name="url" type="url" required></label>
+        <div class="row">
+          <label>Canal<input name="channel" maxlength="180"></label>
+          <label>Publicado em<input name="date" type="date"></label>
+          <label>Views<input name="views" type="number" min="0" step="1"></label>
+        </div>
+        <label>Gancho, ritmo ou entrega que vale testar<textarea name="notes" rows="2" maxlength="1500"></textarea></label>
+        <div class="actions"><button class="primary">Salvar referência</button></div>
+      </form>
+    </details>
+    <div class="strategy-list" id="reference-list"></div>
+  </article>
+</section>
+
+<!-- ============================ CHAT ============================ -->
+<section id="chat" class="workspace-view" data-workspace aria-label="Chat IA" hidden>
+  <div class="chat-workspace">
+    <aside class="chat-sidebar" id="chat-sidebar">
+      <div class="chat-sidebar-top">
+        <button class="primary" type="button" id="btn-new-chat"><svg class="ic"><use href="#i-plus"/></svg>Novo chat</button>
+        <input id="chat-search" type="search" placeholder="Buscar conversas" aria-label="Buscar conversas">
+      </div>
+      <div class="chat-sidebar-label">Conversas</div>
+      <div id="chat-thread-list" class="chat-thread-list"></div>
+      <label class="check chat-archive-toggle"><input type="checkbox" id="chat-show-archived"><span>Mostrar arquivados</span></label>
+    </aside>
+
+    <div class="chat-main">
+      <div class="chat-header">
+        <div class="chat-header-left">
+          <button class="icon-btn chat-mobile-toggle" type="button" id="btn-toggle-sidebar" aria-label="Conversas"><svg class="ic"><use href="#i-menu"/></svg></button>
+          <div>
+            <h2 id="chat-active-title">Direcionador IA</h2>
+            <span class="meta">Salvo automaticamente · cria roteiros, pautas e buscas no painel</span>
+          </div>
+        </div>
+      </div>
+      <div id="chat-messages" class="chat-scroll"></div>
+      <form id="chat-form" class="chat-composer-wrap">
+        <div id="chat-file-preview" class="history-chips" hidden></div>
+        <div class="chat-pill">
+          <label class="chat-plus" for="chat-files" title="Anexar áudio, imagem ou arquivo"><svg class="ic"><use href="#i-clip"/></svg></label>
+          <input id="chat-files" type="file" multiple accept="image/*,audio/*,.txt,.md,.csv,.json,.srt,.vtt" hidden>
+          <textarea id="chat-input" name="message" rows="1" maxlength="4000" placeholder="Pergunte ou peça um roteiro…"></textarea>
+          <button class="chat-send" type="submit" id="btn-chat-send" title="Enviar" aria-label="Enviar"><svg class="ic"><use href="#i-send"/></svg></button>
+        </div>
+        <div class="chat-footer"><span class="meta" id="chat-status" role="status">Enter envia · Shift+Enter quebra linha</span></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ ROTEIRO ============================ -->
+<section id="producao" class="workspace-view" data-workspace aria-label="Roteiro" hidden>
+  <div class="script-layout">
+    <article class="card script-editor">
+      <div class="card-head">
+        <div>
+          <h2>Editor de roteiro</h2>
+          <p class="meta" id="script-state">Novo roteiro</p>
+        </div>
+        <div class="actions">
+          <button class="ghost" id="btn-new-script" type="button"><svg class="ic"><use href="#i-plus"/></svg>Novo</button>
+          <button class="primary" id="btn-generate-script" type="button"><svg class="ic"><use href="#i-sparkles"/></svg><span>Gerar com IA</span></button>
+        </div>
+      </div>
+      <p class="meta" id="script-status" role="status"></p>
+      <label>Pauta / pergunta central<input id="pauta" maxlength="240" placeholder="Que pergunta o vídeo responde?"></label>
+      <div class="row">
+        <label>Tom<input id="script-tom" maxlength="100" value="curiosidade direta + revelação comprovável"></label>
+        <label>Duração alvo (s)<input id="script-duracao" type="number" min="15" max="90" value="45"></label>
+      </div>
+      <div class="pcb-grid">
+        <label class="pcb p"><span><b>1</b> Promessa · 0–3s</span><input id="script-promessa" maxlength="300" placeholder="O gancho que prende nos 3 primeiros segundos"></label>
+        <label class="pcb c"><span><b>2</b> Contexto</span><input id="script-contexto" maxlength="400" placeholder="O mínimo para a pergunta fazer sentido"></label>
+        <label class="pcb e"><span><b>3</b> Entrega</span><input id="script-entrega" maxlength="400" placeholder="A resposta, prova ou mecanismo"></label>
+      </div>
+      <label>Texto para narrar
+        <textarea id="script-text" rows="10" maxlength="5000" placeholder="O roteiro completo aparece aqui. Você pode editar à vontade."></textarea>
+      </label>
+      <div class="script-foot">
+        <span class="meta" id="script-meter">0 palavras · ~0s</span>
+        <div class="actions">
+          <button class="ghost" id="btn-save-draft" type="button"><svg class="ic"><use href="#i-save"/></svg>Salvar rascunho</button>
+          <button class="ghost" id="btn-download-script" type="button"><svg class="ic"><use href="#i-download"/></svg>Baixar .txt</button>
+        </div>
+      </div>
+      <div id="script-checks" class="check-note" hidden></div>
+    </article>
+
+    <div class="side-stack">
+      <article class="card">
+        <div class="card-head">
+          <h3><svg class="ic gold"><use href="#i-wave"/></svg> Narração</h3>
+          <span class="meta" id="tts-conn-badge"></span>
+        </div>
+        <div class="row">
+          <label>Voz
+            <select id="tts-voice">
+              <option>Kore</option><option>Charon</option><option>Puck</option><option>Fenrir</option><option>Aoede</option>
+              <option>Zephyr</option><option>Leda</option><option>Orus</option><option>Sulafat</option><option>Achernar</option>
+              <option>Gacrux</option><option>Enceladus</option>
+            </select>
+          </label>
+          <label>Estilo
+            <select id="tts-style">
+              <option value="narration">Narração envolvente</option>
+              <option value="mystery">Curiosidade / mistério</option>
+              <option value="promote">Energético</option>
+              <option value="friendly">Amigável</option>
+              <option value="whisper">Sussurro / suspense</option>
+            </select>
+          </label>
+        </div>
+        <label class="check"><input type="checkbox" id="tts-confirm" checked><span>Autorizo enviar este texto ao Google para gerar a voz</span></label>
+        <div class="actions">
+          <button class="ghost" id="btn-voice-preview" type="button"><svg class="ic"><use href="#i-volume"/></svg><span>Ouvir prévia da voz</span></button>
+          <button class="primary" id="btn-narration" type="button"><svg class="ic"><use href="#i-mic"/></svg><span>Gerar e baixar áudio</span></button>
+        </div>
+        <p class="meta" id="tts-status" role="status">Conecte a chave do Google AI Studio em Integrações.</p>
+        <audio id="tts-player" controls hidden></audio>
+        <a id="tts-download" class="ghost" download="narracao-fatonexo.wav" hidden><svg class="ic"><use href="#i-download"/></svg>Baixar novamente (.wav)</a>
+      </article>
+      <article class="card">
+        <div class="card-head"><h3>Rascunhos e roteiros</h3></div>
+        <div id="script-drafts-list" class="strategy-list"></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ ESTRATÉGIA ============================ -->
+<section id="estrategia" class="workspace-view" data-workspace aria-label="Estratégia" hidden>
+  <article class="card">
+    <div class="card-head">
+      <div>
+        <h2>Fila de pautas</h2>
+        <p class="meta"><strong>O que é uma pauta?</strong> É o planejamento de cada próximo Short (tema + Promessa, Contexto e Entrega antes de virar roteiro). Use as setas para avançar ou clique em <strong>Roteiro</strong> para escrever.</p>
+      </div>
+      <button class="primary" id="btn-nova-pauta" type="button"><svg class="ic"><use href="#i-plus"/></svg>Nova pauta</button>
+    </div>
+    <div id="idea-list" class="kanban"></div>
+  </article>
+</section>
+
+<!-- ============================ METAS ============================ -->
+<section id="metas" class="workspace-view" data-workspace aria-label="Metas" hidden>
+  <article class="card">
+    <div class="card-head">
+      <div><h2>Metas de monetização</h2><p class="meta">Inscritos e envios vêm do monitor ao vivo. Views dos 90 dias você informa pelo YouTube Studio.</p></div>
+      <a class="ghost" href="https://studio.youtube.com/channel/UCClrO3uvc5-H6NPc6alEHDw/monetization" target="_blank" rel="noopener"><svg class="ic"><use href="#i-ext"/></svg>Abrir Monetização</a>
+    </div>
+    <form id="ypp-views-form" class="inline-form">
+      <input id="ypp-views-input" type="number" min="0" step="1" placeholder="Views qualificadas em 90 dias (YouTube Studio)">
+      <button class="primary" type="submit">Atualizar</button>
+    </form>
+    <div id="ypp-tiers" class="ypp-grid"></div>
+  </article>
+  <div class="two-col">
+    <article class="card">
+      <div class="card-head"><h3><svg class="ic gold"><use href="#i-sparkles"/></svg> Plano para a próxima meta</h3></div>
+      <p class="meta">A IA usa seus números reais para montar um plano em 3 passos.</p>
+      <div class="actions"><button class="primary" type="button" id="btn-ypp-plan"><svg class="ic"><use href="#i-sparkles"/></svg><span>Gerar plano</span></button></div>
+      <div id="ypp-plan-box" class="ai-pulse-box md" hidden></div>
+    </article>
+    <article class="card">
+      <div class="card-head"><h3>Relatório do YouTube Studio</h3></div>
+      <p class="meta" id="report-status" role="status">Importe o CSV de Shorts do Modo avançado do Studio para ver retenção e views engajadas.</p>
+      <div class="actions">
+        <label class="ghost import-button" for="report-upload"><svg class="ic"><use href="#i-file"/></svg>Importar CSV</label>
+        <input id="report-upload" type="file" accept=".csv,text/csv" hidden>
+      </div>
+      <div id="performance-top" class="strategy-list"></div>
+    </article>
+  </div>
+</section>
+
+<!-- ============================ HISTÓRICO ============================ -->
+<section id="historico" class="workspace-view" data-workspace aria-label="Histórico" hidden>
+  <div class="page-intro page-intro-row">
+    <div><h2>Seu acervo</h2><p class="meta">Tudo que você pesquisa, analisa e escreve fica salvo aqui — você pode arquivar ou excluir buscas antigas.</p></div>
+    <label class="check"><input type="checkbox" id="history-show-archived"><span>Mostrar arquivados</span></label>
+  </div>
+  <div class="history-grid">
+    <article class="card"><div class="card-head"><h3>Buscas</h3><span class="count" id="count-searches">0</span></div><div id="history-searches" class="strategy-list"></div></article>
+    <article class="card"><div class="card-head"><h3>Análises</h3><span class="count" id="count-analyses">0</span></div><div id="history-analyses" class="strategy-list"></div></article>
+    <article class="card"><div class="card-head"><h3>Roteiros</h3><span class="count" id="count-scripts">0</span></div><div id="history-scripts" class="strategy-list"></div></article>
+  </div>
+</section>
+
+<!-- ============================ INTEGRAÇÕES ============================ -->
+<section id="integracoes" class="workspace-view" data-workspace aria-label="Integrações" hidden>
+  <div class="integ-grid">
+    <article class="card conn-card">
+      <div class="card-head"><h3><svg class="ic gold"><use href="#i-sparkles"/></svg> OpenCode · IA Padrão do Sistema</h3><span class="badge-ok">Conectado</span></div>
+      <p class="meta">Escolha a IA padrão do painel. Modelos separados por capacidade: leitura visual (vídeo/imagem) e processamento de documentos/textos. Áudios são transcritos localmente via Whisper.</p>
+      <div class="stack-form" style="margin-top:14px">
+        <label>IA padrão do painel
+          <select id="default-ai-model"></select>
+        </label>
+        <div class="ai-cap-split">
+          <div class="ai-cap-box">
+            <strong><svg class="ic gold"><use href="#i-film"/></svg> Leitura de Vídeo, Imagem &amp; Áudio</strong>
+            <div id="ai-list-media" class="history-chips"></div>
+          </div>
+          <div class="ai-cap-box">
+            <strong><svg class="ic gold"><use href="#i-file"/></svg> Documentos, Textos &amp; Roteiros</strong>
+            <div id="ai-list-text" class="history-chips"></div>
+          </div>
+        </div>
+      </div>
+    </article>
+    <article class="card conn-card">
+      <div class="card-head"><h3><svg class="ic gold"><use href="#i-mic"/></svg> Google AI Studio</h3><span class="badge-ok" id="gemini-conn-badge" hidden>Conectado</span></div>
+      <p class="meta">Chave da Gemini API para gerar a narração (TTS).</p>
+      <form class="provider-form stack-form" data-provider="gemini" autocomplete="off">
+        <label>Chave Gemini<input name="key" type="password" required minlength="16" maxlength="400" autocomplete="off" placeholder="Cole para trocar a chave"></label>
+        <div class="actions"><button class="primary">Validar e salvar</button><a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Abrir AI Studio</a></div>
+        <p class="meta" id="gemini-status" role="status"></p>
+      </form>
+    </article>
+    <article class="card conn-card">
+      <div class="card-head"><h3><svg class="ic gold"><use href="#i-film"/></svg> YouTube Data API v3</h3><span class="badge-ok" id="youtube-conn-badge" hidden>Conectado</span></div>
+      <p class="meta">Opcional. A busca já funciona sem chave; com a API você ganha filtros oficiais.</p>
+      <form class="provider-form stack-form" data-provider="youtube" autocomplete="off">
+        <label>Chave YouTube<input name="key" type="password" required minlength="16" maxlength="400" autocomplete="off" placeholder="Cole para trocar a chave"></label>
+        <div class="actions"><button class="primary">Validar e salvar</button></div>
+        <p class="meta" id="youtube-status" role="status"></p>
+      </form>
+    </article>
+  </div>
+</section>
+
+    </main>
+  </div>
+</div>
+
+<div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+
+<!-- Análise de vídeo -->
+<aside class="drawer" id="video-analysis-card" aria-label="Análise de roteiro e estratégia" aria-hidden="true">
+  <div class="drawer-head">
+    <h3><svg class="ic gold"><use href="#i-film"/></svg> Roteiro e estratégia</h3>
+    <button class="icon-btn" type="button" data-close-drawer aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <form id="analyze-url-form" class="inline-form">
+      <input name="url" placeholder="Link ou ID de um Short/vídeo" required maxlength="200">
+      <button class="primary" type="submit">Analisar</button>
+    </form>
+    <p id="analysis-status" class="meta" role="status">Cole um link ou clique em “Analisar roteiro” em qualquer resultado.</p>
+    <div id="analysis-loading" class="skeleton-stack" hidden><i></i><i></i><i></i><i></i></div>
+    <div id="analysis-result" hidden>
+      <div id="analysis-meta" class="analysis-meta"></div>
+      <div id="analysis-breakdown" class="analysis-grid"></div>
+      <details id="analysis-transcript-box" class="fold">
+        <summary>Transcrição capturada (ou cole a fala)</summary>
+        <textarea id="analysis-transcript-input" rows="4" placeholder="Se o YouTube não liberar a legenda, cole aqui a fala do vídeo e reanalise."></textarea>
+        <div class="actions"><button class="ghost" type="button" id="btn-reanalyze"><svg class="ic"><use href="#i-refresh"/></svg>Reanalisar com este texto</button></div>
+      </details>
+      <div class="actions sticky-actions">
+        <button class="primary" type="button" id="btn-use-adaptation"><svg class="ic"><use href="#i-pen"/></svg>Criar roteiro com esta adaptação</button>
+        <button class="ghost" type="button" id="btn-save-adaptation-idea"><svg class="ic"><use href="#i-compass"/></svg>Salvar na Estratégia</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Nova pauta -->
+<aside class="drawer" id="idea-drawer" aria-label="Pauta" aria-hidden="true">
+  <div class="drawer-head">
+    <h3><svg class="ic gold"><use href="#i-compass"/></svg> Pauta</h3>
+    <button class="icon-btn" type="button" data-close-drawer aria-label="Fechar"><svg class="ic"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <form id="idea-form" class="stack-form">
+      <label>Pauta<input name="title" required maxlength="160" placeholder="Qual pergunta o vídeo responde?"></label>
+      <div class="row">
+        <label>Pilar<select name="pillar"><option>Objetos e mecanismos</option><option>Ciência visual</option><option>Histórias verificáveis</option><option>Outro</option></select></label>
+        <label>Status<select name="status"><option>Ideia</option><option>Prioridade</option><option>Em produção</option><option>Publicado</option></select></label>
+      </div>
+      <label>Referência<select name="reference"></select></label>
+      <label>Promessa (0–3s)<input name="promise" maxlength="280" placeholder="O que o público vai descobrir?"></label>
+      <label>Contexto<input name="context" maxlength="280" placeholder="O que precisa saber para entender?"></label>
+      <label>Entrega<input name="payoff" maxlength="280" placeholder="Qual prova ou explicação fecha o vídeo?"></label>
+      <details class="fold">
+        <summary>Resultados do Short publicado</summary>
+        <div class="row">
+          <label>Idade (dias)<input name="age" type="number" min="0" step="1"></label>
+          <label>Continuaram (%)<input name="stayed" type="number" min="0" max="100" step="0.1"></label>
+        </div>
+        <div class="row">
+          <label>Média assistida (%)<input name="watched" type="number" min="0" step="0.1"></label>
+          <label>Views engajadas<input name="engaged" type="number" min="0" step="1"></label>
+        </div>
+        <label>Aprendizado ou próximo teste<textarea name="learning" rows="2" maxlength="1000"></textarea></label>
+      </details>
+      <div class="actions"><button class="primary">Salvar pauta</button><button class="ghost" id="btn-cancelar-pauta" type="button">Cancelar</button></div>
+    </form>
+  </div>
+</aside>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script type="module" src="/panel.js"></script>
+</body>
+</html>
