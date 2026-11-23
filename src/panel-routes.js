@@ -142,18 +142,25 @@ function computeGrowth(history) {
 
 panelRoutes.use((req, res, next) => {
   const origin = req.get("origin")
-  const currentOrigin = `${req.protocol}://${req.get("host")}`
+  const proto = req.get("x-forwarded-proto")?.split(",")[0].trim() || req.protocol
+  const hostHeader = req.get("x-forwarded-host") || req.get("host") || ""
+  const currentOrigin = `${proto}://${hostHeader}`
   if (!process.env.VERCEL) {
     const loopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress)
-    const host = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(req.get("host") || "")
+    const host = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(hostHeader)
     if (!loopback || !host) {
       return res.status(403).json({ error: "Abra o painel pelo endereço local do Studio." })
     }
   }
+  const sameHost = (() => {
+    if (!origin) return true
+    try { return new URL(origin).host === hostHeader } catch { return false }
+  })()
   if (
-    (origin && origin !== currentOrigin) ||
+    !sameHost ||
+    (origin && origin !== currentOrigin && !process.env.VERCEL) ||
     req.get("sec-fetch-site") === "cross-site" ||
-    (req.method === "POST" && (origin !== currentOrigin || (!req.is("application/json") && !req.is("multipart/form-data"))))
+    (req.method === "POST" && ((!origin && !process.env.VERCEL) || (!req.is("application/json") && !req.is("multipart/form-data"))))
   ) {
     return res.status(403).json({ error: "Requisição bloqueada por proteção de origem." })
   }

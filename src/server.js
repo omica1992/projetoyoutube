@@ -23,6 +23,7 @@ import { gerarHtmlComIa, writeEngineHtml, parseRoteiro } from "./htmlgen.js"
 import { captureFrames, encodeMp4, findChrome } from "./render.js"
 
 const app = express()
+app.set("trust proxy", 1)
 const PORT = Number(process.env.PORT ?? 5173)
 const UPLOAD_DIR = process.env.VERCEL ? "/tmp/studio-uploads" : path.join(DATA_DIR, "_uploads")
 
