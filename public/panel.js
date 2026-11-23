@@ -1361,6 +1361,8 @@ initLive({
     openWorkspace("chat", true)
     activeChatId = null
     lastChatList = []
+    $("#chat-active-title").textContent = "Nova conversa · Análise do canal"
+    renderChatSidebar()
     renderChat([])
     sendChat(`Analise os números ao vivo do canal: ${c?.subs ?? "?"} inscritos, ${c?.views ?? 0} views somadas nos Shorts, média de ${c?.avg ?? 0} por Short. O que devo fazer agora para crescer mais rápido?`)
   },

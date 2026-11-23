@@ -51,8 +51,8 @@ function writeLocal(data) {
 export async function readAcervo() {
   if (hasSupabase()) {
     const [items, chatsRows] = await Promise.all([
-      sbSelect("fatonexo_acervo", "select=*&order=created_at.desc&limit=240"),
-      sbSelect("fatonexo_chats", "select=*&order=updated_at.desc&limit=60"),
+      sbSelect("fatonexo_acervo", "select=*&order=created_at.desc&limit=60"),
+      sbSelect("fatonexo_chats", "select=*&order=updated_at.desc&limit=40"),
     ])
     const out = EMPTY()
     for (const row of items) {

@@ -70,11 +70,10 @@ export async function getSnapshotAsync() {
       }
     } catch {}
   }
-  const lastT = state.series.at(-1)?.lastSeen || state.series.at(-1)?.t || 0
-  if (process.env.VERCEL && Date.now() - lastT >= POLL_MS) {
-    return pollOnce()
+  if (!state.series.length) {
+    await pollOnce()
   }
-  return getSnapshot()
+  return { ...getSnapshot(), sse: !process.env.VERCEL }
 }
 
 function baseline(list, ms) {
@@ -290,21 +289,23 @@ async function writeCatalogCache(cache) {
 export async function getChannelVideosCatalog() {
   const shorts = state.shorts.length ? state.shorts : (await getChannelPublicOverview(HANDLE, CHANNEL_ID)).recentShorts || []
   const cache = await readCatalogCache()
-  const missing = shorts.filter((s) => s.id && !cache[s.id]).slice(0, 18)
+  const missing = shorts.filter((s) => s.id && !cache[s.id]).slice(0, 6)
   if (missing.length) {
-    for (const s of missing) {
-      try {
-        const det = await getVideoDetailsAndTranscript(s.id)
-        cache[s.id] = {
-          id: s.id,
-          title: det.title || s.title,
-          durationSeconds: det.durationSeconds,
-          description: (det.description || "").slice(0, 600),
-          transcript: (det.transcript || "").slice(0, 1500),
-          cachedAt: Date.now(),
-        }
-      } catch {}
-    }
+    await Promise.allSettled(
+      missing.map(async (s) => {
+        try {
+          const det = await getVideoDetailsAndTranscript(s.id)
+          cache[s.id] = {
+            id: s.id,
+            title: det.title || s.title,
+            durationSeconds: det.durationSeconds,
+            description: (det.description || "").slice(0, 600),
+            transcript: (det.transcript || "").slice(0, 1500),
+            cachedAt: Date.now(),
+          }
+        } catch {}
+      }),
+    )
     await writeCatalogCache(cache)
   }
   return shorts.map((s) => ({

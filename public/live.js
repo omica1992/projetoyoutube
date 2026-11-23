@@ -491,14 +491,18 @@ export function initLive(h) {
     $$("#chart-range button").forEach((x) => x.classList.toggle("active", x === b))
     if (snap) renderChart()
   })
-  connect()
-  apiJson("/api/painel/canal/live").then((s) => !snap && apply(s)).catch(() => {})
+  apiJson("/api/painel/canal/live")
+    .then((s) => {
+      if (!snap) apply(s)
+      if (s?.sse !== false) connect()
+    })
+    .catch(() => connect())
   setInterval(tick, 1000)
-  // se o SSE cair por muito tempo, busca por polling
+  // se o SSE não estiver ativo (ex.: Vercel), busca por polling a cada 30s
   setInterval(async () => {
     if (es && es.readyState === 1) return
     try { apply(await apiJson("/api/painel/canal/live")) } catch {}
-  }, 20_000)
+  }, 30_000)
 }
 
 function renderKpisEmpty() {
