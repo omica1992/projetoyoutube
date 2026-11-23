@@ -6,6 +6,10 @@ import multer from "multer"
 import { spawn } from "node:child_process"
 import ffmpegPath from "ffmpeg-static"
 
+if (!process.env.VERCEL) {
+  try { process.loadEnvFile(new URL("../.env", import.meta.url)) } catch {}
+}
+
 import { DATA_DIR, PUBLIC_DIR, MODELS, FPS, WIDTH, HEIGHT } from "./config.js"
 import { ask, parseJsonLoose } from "./opencode.js"
 import { buildTrendBrief } from "./trends.js"
