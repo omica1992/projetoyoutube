@@ -50,10 +50,14 @@ function writeLocal(data) {
 
 export async function readAcervo() {
   if (hasSupabase()) {
-    const [items, chatsRows] = await Promise.all([
-      sbSelect("fatonexo_acervo", "select=*&order=created_at.desc&limit=60"),
+    const kinds = ["buscas", "analises", "roteiros"]
+    const [perKind, chatsRows] = await Promise.all([
+      Promise.all(
+        kinds.map((k) => sbSelect("fatonexo_acervo", `select=*&kind=eq.${k}&order=created_at.desc&limit=60`)),
+      ),
       sbSelect("fatonexo_chats", "select=*&order=updated_at.desc&limit=40"),
     ])
+    const items = perKind.flat()
     const out = EMPTY()
     for (const row of items) {
       const entry = {

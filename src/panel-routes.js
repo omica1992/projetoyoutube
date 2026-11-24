@@ -4,6 +4,7 @@ import crypto from "node:crypto"
 import express from "express"
 import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
+import { hasSupabase, kvGet, kvSet } from "./db.js"
 import { askFallback, parseJsonLoose } from "./opencode.js"
 import { generateNarration, providerKey, storeProviderKey, verifyGemini, CHANNEL_ID, VOICE_CATALOG } from "./panel-providers.js"
 import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey } from "./youtube.js"
@@ -72,7 +73,17 @@ const ALLOWED_IDS = new Set(AI_CATALOG.map((m) => m.id))
 const VOICE_PREVIEW_DIR = path.join(DATA_DIR, "_voice_previews")
 if (!process.env.VERCEL) fs.mkdirSync(VOICE_PREVIEW_DIR, { recursive: true })
 
+// Na Vercel sem AI_API_URL só a Gemini responde: expõe apenas esse modelo.
+const CLOUD_ONLY = Boolean(process.env.VERCEL && !process.env.AI_API_URL)
+const CLOUD_MODEL = {
+  id: "gemini/gemini-2.5-flash",
+  label: "Gemini 2.5 Flash (Nuvem)",
+  group: "Nuvem · Textos / Docs",
+  cap: "text",
+}
+
 function pickModels(requested) {
+  if (CLOUD_ONLY) return [CLOUD_MODEL.id]
   const chosen = ALLOWED_IDS.has(requested) ? requested : MODELS.direcionador
   return [chosen, ...MODELS.direcionadorFallback.filter((m) => m !== chosen)]
 }
@@ -89,7 +100,15 @@ function extractVideoId(input = "") {
   return ""
 }
 
-function readHistory() {
+async function readHistory() {
+  if (hasSupabase()) {
+    try {
+      const v = await kvGet("canal-historico")
+      return Array.isArray(v) ? v : []
+    } catch {
+      return []
+    }
+  }
   if (process.env.VERCEL) return []
   try {
     if (!fs.existsSync(HISTORY_FILE)) return []
@@ -100,8 +119,8 @@ function readHistory() {
   }
 }
 
-function appendHistory(snapshot) {
-  const list = readHistory()
+async function appendHistory(snapshot) {
+  const list = await readHistory()
   const today = snapshot.observedAt.slice(0, 10)
   const entry = {
     date: today,
@@ -115,7 +134,11 @@ function appendHistory(snapshot) {
   if (idx >= 0) list[idx] = entry
   else list.push(entry)
   const trimmed = list.slice(-90)
-  if (!process.env.VERCEL) {
+  if (hasSupabase()) {
+    try {
+      await kvSet("canal-historico", trimmed)
+    } catch {}
+  } else if (!process.env.VERCEL) {
     fs.mkdirSync(DATA_DIR, { recursive: true })
     fs.writeFileSync(HISTORY_FILE, JSON.stringify(trimmed, null, 2), "utf8")
   }
@@ -183,6 +206,7 @@ const route = (handler) => async (req, res) => {
 panelRoutes.get(
   "/modelos",
   route(async (_req, res) => {
+    if (CLOUD_ONLY) return res.json({ default: CLOUD_MODEL.id, available: [CLOUD_MODEL] })
     res.json({
       default: MODELS.direcionador,
       available: AI_CATALOG,
@@ -397,6 +421,12 @@ panelRoutes.post(
         }
       }
     } catch {}
+    if (!transcricaoManual && !video.transcript && !video.title && !video.description) {
+      return res.status(422).json({
+        error:
+          "Não consegui ler os dados deste vídeo (título, descrição ou legenda). Confira o link/ID ou cole a fala do vídeo no campo de transcrição e tente de novo.",
+      })
+    }
     const models = pickModels(req.body?.model)
     const ai = await askFallback({
       models,
@@ -509,7 +539,7 @@ panelRoutes.get(
   "/canal",
   route(async (req, res) => {
     const channel = await getChannelPublicOverview(HANDLE, CHANNEL_ID)
-    const history = appendHistory(channel)
+    const history = await appendHistory(channel)
     const growth = computeGrowth(history)
     let aiPulse = ""
     if (req.query.ai === "1") {
