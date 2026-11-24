@@ -113,7 +113,7 @@ function downloadText(filename, content) {
 }
 
 $("#btn-gerar-pacote")?.addEventListener("click", async () => {
-  const titulo = $("#script-pauta")?.value?.trim() || $("#script-promessa")?.value?.trim() || "Short"
+  const titulo = $("#pauta")?.value?.trim() || $("#script-promessa")?.value?.trim() || "Short"
   const texto = $("#script-text")?.value?.trim() || ""
   const out = $("#pacote-out")
   if (!texto) return toast("Escreva ou gere um roteiro no editor acima primeiro", "error")
@@ -359,6 +359,12 @@ async function loadAnalytics() {
 
 $("#btn-analytics")?.addEventListener("click", loadAnalytics)
 
+$("#up-video-file")?.addEventListener("change", (e) => {
+  const f = e.currentTarget.files?.[0]
+  const lbl = $("#up-video-name")
+  if (lbl) lbl.textContent = f ? `${f.name} (${(f.size / 1048576).toFixed(1)} MB)` : "Escolher vídeo (.mp4 / .mov)"
+})
+
 $("#upload-youtube-form")?.addEventListener("submit", async (e) => {
   e.preventDefault()
   const status = $("#up-youtube-status")
@@ -380,6 +386,8 @@ $("#upload-youtube-form")?.addEventListener("submit", async (e) => {
     )
     toast("Short enviado para o YouTube!")
     e.currentTarget.reset()
+    const lbl = $("#up-video-name")
+    if (lbl) lbl.textContent = "Escolher vídeo (.mp4 / .mov)"
     loadPublishList()
   } catch (err) {
     status.textContent = `Erro: ${err.message}`
@@ -460,17 +468,51 @@ $("#agenda-form")?.addEventListener("submit", async (e) => {
   loadAgenda()
 })
 
+/* ==================== SUB-ABAS & MENU MOBILE ==================== */
+for (const bar of document.querySelectorAll("[data-subtabs]")) {
+  const group = bar.getAttribute("data-subtabs")
+  bar.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-subtarget]")
+    if (!b) return
+    const target = b.getAttribute("data-subtarget")
+    for (const x of bar.querySelectorAll("button[data-subtarget]")) x.classList.toggle("active", x === b)
+    for (const p of document.querySelectorAll(`[data-subgroup="${group}"]`)) {
+      p.hidden = p.getAttribute("data-subpanel") !== target
+    }
+    if (target === "pesq-radar" && !radarLoaded) loadRadar(true)
+    if (target === "prod-publicar") {
+      loadPublishList()
+      const tInp = $("#up-title")
+      const pVal = $("#pauta")?.value?.trim()
+      if (tInp && !tInp.value && pVal) tInp.value = pVal
+    }
+    if (target === "est-agenda" && !agendaLoaded) loadAgenda()
+    if (target === "metas-retencao" && !analyticsLoaded) loadAnalytics()
+    if (target === "metas-padroes" && !padroesLoaded) loadPadroes(false)
+    window.dispatchEvent(new CustomEvent("subtab:change", { detail: { group, target } }))
+  })
+}
+
+const rail = $("#rail")
+$("#btn-mobile-nav")?.addEventListener("click", () => {
+  rail?.classList.toggle("mobile-open")
+})
+rail?.addEventListener("click", (e) => {
+  if (e.target.closest("a")) rail.classList.remove("mobile-open")
+})
+
 /* ==================== AUTO-LOAD POR ABA ==================== */
 function onWorkspace(id) {
-  if (id === "pesquisa" && !radarLoaded) loadRadar(true)
+  rail?.classList.remove("mobile-open")
+  if (id === "pesquisa" && !radarLoaded && !$("#radar-concorrentes-card")?.closest("[hidden]")) loadRadar(true)
   if (id === "producao") loadPublishList()
   if (id === "estrategia") {
     if (!funilLoaded) loadFunil()
-    if (!agendaLoaded) loadAgenda()
+    if (!agendaLoaded && !$("#agenda-card")?.closest("[hidden]")) loadAgenda()
   }
   if (id === "metas") {
-    if (!padroesLoaded) loadPadroes(false)
-    if (!analyticsLoaded) loadAnalytics()
+    if (!padroesLoaded && !$("#padroes-card")?.closest("[hidden]")) loadPadroes(false)
+    if (!analyticsLoaded && !$("#analytics-card")?.closest("[hidden]")) loadAnalytics()
   }
   if (id === "integracoes" && !oauthLoaded) loadOAuthCard()
 }

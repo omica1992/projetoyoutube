@@ -10,9 +10,10 @@ function heat(avg, max) {
   return `background:rgba(241,196,83,${(a * 0.75).toFixed(2)});color:${a > 0.55 ? "#1a1405" : "#e8efe9"}`
 }
 
-function table(headers, rows) {
+function table(headers, rows, minWidth = 340) {
+  const wrap = el("div", "", "table-scroll")
   const t = el("table")
-  t.style.cssText = "width:100%;border-collapse:separate;border-spacing:4px;font-size:13px;text-align:center"
+  t.style.cssText = `width:100%;min-width:${minWidth}px;border-collapse:separate;border-spacing:4px;font-size:13px;text-align:center`
   const thead = el("tr")
   for (const h of headers) {
     const th = el("th", h)
@@ -21,7 +22,8 @@ function table(headers, rows) {
   }
   t.append(thead)
   for (const r of rows) t.append(r)
-  return t
+  wrap.append(t)
+  return wrap
 }
 
 function section(title, ...nodes) {
@@ -66,11 +68,13 @@ function renderMarket(market) {
     }
     return tr
   }
+  const wrap = el("div", "", "table-scroll")
   const t = el("table")
-  t.style.cssText = "width:100%;border-collapse:separate;border-spacing:3px;text-align:center"
+  t.style.cssText = "width:100%;min-width:520px;border-collapse:separate;border-spacing:3px;text-align:center"
   t.append(row(0), row(12))
+  wrap.append(t)
   const legend = el("p", `Velocidade = views por hora desde a publicação, por hora de postagem. Amostra: ${market.sampleSize} Shorts de até 4 dias.`, "meta")
-  return section("Mercado — hora de postagem × views/hora", t, legend)
+  return section("Mercado — hora de postagem × views/hora", wrap, legend)
 }
 
 function render(data) {
@@ -105,7 +109,10 @@ async function load(ai = false) {
 
 $("#btn-horarios")?.addEventListener("click", () => load(false))
 $("#btn-horarios-ai")?.addEventListener("click", () => load(true))
+window.addEventListener("subtab:change", (e) => {
+  if (e.detail?.target === "est-horarios" && !loaded) load(false)
+})
 window.addEventListener("workspace:change", (e) => {
-  if (e.detail?.id === "estrategia" && !loaded) load(false)
+  if (e.detail?.id === "estrategia" && !loaded && !$("#horarios-card")?.closest("[hidden]")) load(false)
 })
 if (window.location.hash === "#estrategia") load(false)
