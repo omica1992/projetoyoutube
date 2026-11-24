@@ -14,6 +14,7 @@ import { DATA_DIR, PUBLIC_DIR, MODELS, FPS, WIDTH, HEIGHT } from "./config.js"
 import { ask, parseJsonLoose } from "./opencode.js"
 import { buildTrendBrief } from "./trends.js"
 import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey, YouTubeApiError } from "./youtube.js"
+import { disconnectOAuth, exchangeCode, getAuthUrl, getOAuthStatus } from "./youtube-oauth.js"
 import { panelRoutes } from "./panel-routes.js"
 import { promptRoteiro } from "./prompts.js"
 import { transcribeAudio } from "./transcribe.js"
@@ -208,10 +209,47 @@ app.use("/api/youtube", (req, res, next) => {
 
 app.get("/api/youtube/conexao", async (_req, res) => {
   try {
-    res.json({ configured: Boolean(await getYouTubeKeyAsync()) })
+    const [configured, oauth] = await Promise.all([getYouTubeKeyAsync(), getOAuthStatus()])
+    res.json({ configured: Boolean(configured), oauth })
   } catch {
     res.status(500).json({ error: "O Studio não conseguiu ler a configuração do YouTube." })
   }
+})
+
+function requestOrigin(req) {
+  const proto = String(req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim()
+  const host = String(req.get("x-forwarded-host") || req.get("host") || "").split(",")[0].trim()
+  return `${proto}://${host}`
+}
+
+app.get("/api/youtube/oauth/status", async (_req, res) => {
+  res.json(await getOAuthStatus())
+})
+
+app.get("/api/youtube/oauth/start", async (req, res) => {
+  try {
+    const url = await getAuthUrl(requestOrigin(req))
+    res.redirect(url)
+  } catch (e) {
+    res.status(400).send(e instanceof Error ? e.message : "Erro ao iniciar OAuth.")
+  }
+})
+
+app.get("/api/youtube/oauth/callback", async (req, res) => {
+  const code = typeof req.query.code === "string" ? req.query.code : ""
+  if (!code) return res.redirect("/#integracoes?oauth=erro")
+  try {
+    await exchangeCode(code, requestOrigin(req))
+    res.redirect("/#integracoes?oauth=ok")
+  } catch (e) {
+    const msg = encodeURIComponent(e instanceof Error ? e.message.slice(0, 140) : "Erro OAuth")
+    res.redirect(`/#integracoes?oauth=erro&msg=${msg}`)
+  }
+})
+
+app.post("/api/youtube/oauth/disconnect", async (_req, res) => {
+  await disconnectOAuth()
+  res.json({ connected: false })
 })
 
 app.post("/api/youtube/conexao", async (req, res) => {

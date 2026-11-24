@@ -418,8 +418,29 @@
             <input id="pub-url-input" type="text" placeholder="URL ou ID do Short publicado" style="flex:1;min-width:180px">
             <button class="primary" id="btn-vincular-short" type="button">Vincular</button>
           </div>
-          <div id="pub-roteiros-lista" class="strategy-list"></div>
+      <div id="pub-roteiros-lista" class="strategy-list"></div>
         </div>
+      </article>
+      <article class="card" id="upload-youtube-card">
+        <div class="card-head">
+          <div><h3>Publicar Short no YouTube (OAuth)</h3><p class="meta">Envie o vídeo direto para o canal (Privado, Não listado, Público ou Agendado).</p></div>
+        </div>
+        <form id="upload-youtube-form" class="strategy-list">
+          <input id="up-video-file" name="video" type="file" accept="video/mp4,video/quicktime,video/*" required>
+          <input id="up-title" name="title" type="text" maxlength="100" placeholder="Título do Short (ex: 😱 Em Vênus... #Shorts)" required>
+          <textarea id="up-desc" name="description" rows="2" maxlength="5000" placeholder="Descrição (opcional)"></textarea>
+          <input id="up-tags" name="tags" type="text" placeholder="Tags separadas por vírgula (ex: curiosidades,espaco,shorts)">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="up-privacy" name="privacyStatus">
+              <option value="private">Privado (rascunho seguro)</option>
+              <option value="unlisted">Não listado</option>
+              <option value="public">Público</option>
+            </select>
+            <input id="up-publish-at" name="publishAt" type="datetime-local" title="Agendar publicação (opcional)">
+          </div>
+          <div class="actions"><button class="primary" id="btn-up-youtube" type="submit">Publicar no YouTube</button></div>
+          <p class="meta" id="up-youtube-status" role="status"></p>
+        </form>
       </article>
     </div>
   </div>
@@ -505,6 +526,16 @@
     </div>
     <div id="padroes-out" class="strategy-list"><p class="meta">Abra esta aba para comparar seus Shorts.</p></div>
   </article>
+  <article class="card" id="analytics-card" style="margin-top:16px">
+    <div class="card-head">
+      <div>
+        <h2>Retenção Real (YouTube Analytics API)</h2>
+        <p class="meta">Métricas privadas dos últimos 28 dias via OAuth 2.0: % de retenção média, tempo assistido e inscritos ganhos.</p>
+      </div>
+      <button class="primary" id="btn-analytics" type="button">Carregar Analytics</button>
+    </div>
+    <div id="analytics-out" class="strategy-list"><p class="meta">Conecte sua conta em Integrações para carregar.</p></div>
+  </article>
 </section>
 
 <!-- ============================ HISTÓRICO ============================ -->
@@ -559,6 +590,15 @@
         <div class="actions"><button class="primary">Validar e salvar</button></div>
         <p class="meta" id="youtube-status" role="status"></p>
       </form>
+    </article>
+    <article class="card conn-card" id="youtube-oauth-card">
+      <div class="card-head"><h3><svg class="ic gold"><use href="#i-users"/></svg> Conta do Canal (OAuth 2.0)</h3><span class="badge-ok" id="oauth-conn-badge" hidden>Conectado</span></div>
+      <p class="meta">Libera upload/postagem direta de Shorts e métricas reais de retenção do YouTube Analytics.</p>
+      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="primary" id="btn-oauth-connect" href="/api/youtube/oauth/start" style="text-decoration:none;display:inline-flex;align-items:center;padding:8px 14px;border-radius:10px">Conectar conta do YouTube</a>
+        <button class="ghost" id="btn-oauth-disconnect" type="button" hidden>Desconectar</button>
+      </div>
+      <p class="meta" id="oauth-status" role="status" style="margin-top:8px"></p>
     </article>
   </div>
 </section>

@@ -6,7 +6,8 @@ import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 import { buildHorarios } from "./horarios.js"
-import { ytGetVideoComments } from "./youtube.js"
+import { ytGetVideoComments, ytGetVideosByIds } from "./youtube.js"
+import { getAnalyticsSummary, getOAuthStatus, uploadShortToYouTube } from "./youtube-oauth.js"
 import {
   buildRadar,
   buildSrtFromText,
@@ -542,6 +543,61 @@ panelRoutes.post(
       timeoutMs: 90_000,
     })
     res.json({ resposta: ai.text.trim(), model: ai.model })
+  }),
+)
+
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 40 * 1024 * 1024, files: 1 },
+})
+
+panelRoutes.get(
+  "/youtube/analytics",
+  route(async (_req, res) => {
+    const st = await getOAuthStatus()
+    if (!st.connected) {
+      return res.status(401).json({ error: "Conecte sua conta do YouTube (OAuth 2.0) em Integrações para ver a retenção real." })
+    }
+    const summary = await getAnalyticsSummary()
+    const ids = summary.topVideos.map((v) => v.videoId)
+    const details = ids.length ? await ytGetVideosByIds(ids).catch(() => []) : []
+    const byId = new Map((details || []).map((d) => [d.id, d]))
+    summary.topVideos = summary.topVideos.map((v) => ({ ...v, title: byId.get(v.videoId)?.title || v.videoId }))
+    res.json(summary)
+  }),
+)
+
+panelRoutes.post(
+  "/youtube/upload",
+  videoUpload.single("video"),
+  route(async (req, res) => {
+    if (!req.file?.buffer?.length) return res.status(400).json({ error: "Selecione um arquivo de vídeo (.mp4 / .mov)." })
+    const title = String(req.body?.title || "").trim()
+    if (!title) return res.status(400).json({ error: "Informe o título do Short." })
+    const tags = String(req.body?.tags || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const uploaded = await uploadShortToYouTube({
+      buffer: req.file.buffer,
+      mimetype: req.file.mimetype || "video/mp4",
+      title,
+      description: String(req.body?.description || ""),
+      tags,
+      privacyStatus: String(req.body?.privacyStatus || "private"),
+      publishAt: String(req.body?.publishAt || ""),
+    })
+    const roteiroId = String(req.body?.roteiroId || "").trim()
+    if (roteiroId) {
+      await updateAcervoItem("roteiros", roteiroId, {
+        status: "publicado",
+        publishedId: uploaded.id,
+        publishedUrl: uploaded.url,
+        publishedTitle: uploaded.title,
+        publishedAt: new Date().toISOString(),
+      }).catch(() => {})
+    }
+    res.json({ uploaded })
   }),
 )
 

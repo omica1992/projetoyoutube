@@ -297,12 +297,108 @@ $("#btn-video-comments")?.addEventListener("click", async () => {
   }
 })
 
+/* ==================== 8. OAUTH 2.0, ANALYTICS REAL & UPLOAD ==================== */
+let oauthLoaded = false
+let analyticsLoaded = false
+
+async function loadOAuthCard() {
+  const badge = $("#oauth-conn-badge")
+  const btnConn = $("#btn-oauth-connect")
+  const btnDisc = $("#btn-oauth-disconnect")
+  const st = $("#oauth-status")
+  if (!st) return
+  try {
+    const res = await apiJson("/api/youtube/oauth/status")
+    if (badge) badge.hidden = !res.connected
+    if (btnDisc) btnDisc.hidden = !res.connected
+    if (btnConn) btnConn.textContent = res.connected ? "Reconectar conta" : "Conectar conta do YouTube"
+    st.textContent = res.connected
+      ? "Conta conectada: upload de Shorts e YouTube Analytics liberados."
+      : res.configured
+        ? "Credenciais OAuth prontas. Clique acima para autorizar seu canal no Google."
+        : "Credenciais OAuth não configuradas no servidor."
+    oauthLoaded = true
+  } catch (e) {
+    st.textContent = e.message
+  }
+}
+
+$("#btn-oauth-disconnect")?.addEventListener("click", async () => {
+  await apiJson("/api/youtube/oauth/disconnect", { method: "POST" })
+  toast("Conta YouTube desconectada")
+  loadOAuthCard()
+})
+
+async function loadAnalytics() {
+  const out = $("#analytics-out")
+  if (!out) return
+  out.replaceChildren(el("p", "Consultando YouTube Analytics API (28 dias)…", "meta"))
+  try {
+    const res = await apiJson("/api/painel/youtube/analytics")
+    const s = res.summary
+    out.replaceChildren(
+      el(
+        "p",
+        `Últimos 28 dias (${res.period.startDate} a ${res.period.endDate}): ${numFmt.format(s.views)} views · ${numFmt.format(s.estimatedMinutesWatched)} min assistidos · retenção média ${s.averageViewPercentage.toFixed(1)}% (${Math.round(s.averageViewDuration)}s) · +${s.subscribersGained} inscritos.`,
+      ),
+      ...res.topVideos.slice(0, 8).map((v) => {
+        const d = el("div")
+        d.style.cssText = "padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"
+        d.append(
+          extLink(v.title || v.videoId, `https://www.youtube.com/shorts/${v.videoId}`),
+          el("span", `${numFmt.format(v.views)} views · ${v.averageViewPercentage.toFixed(1)}% retenção · +${v.subscribersGained} insc.`, "chip up"),
+        )
+        return d
+      }),
+    )
+    analyticsLoaded = true
+  } catch (e) {
+    out.replaceChildren(el("p", e.message, "meta"))
+  }
+}
+
+$("#btn-analytics")?.addEventListener("click", loadAnalytics)
+
+$("#upload-youtube-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault()
+  const status = $("#up-youtube-status")
+  const btn = $("#btn-up-youtube")
+  const file = $("#up-video-file")?.files?.[0]
+  if (!file) return toast("Escolha um vídeo para enviar", "error")
+  const fd = new FormData(e.currentTarget)
+  const roteiroId = $("#pub-roteiro-select")?.value
+  if (roteiroId) fd.append("roteiroId", roteiroId)
+  btn.disabled = true
+  status.textContent = "Enviando vídeo para o YouTube…"
+  try {
+    const r = await fetch("/api/painel/youtube/upload", { method: "POST", body: fd })
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`)
+    status.replaceChildren(
+      document.createTextNode(`Publicado (${data.uploaded.privacyStatus}): `),
+      extLink(data.uploaded.title, data.uploaded.url),
+    )
+    toast("Short enviado para o YouTube!")
+    e.currentTarget.reset()
+    loadPublishList()
+  } catch (err) {
+    status.textContent = `Erro: ${err.message}`
+    toast(err.message, "error")
+  } finally {
+    btn.disabled = false
+  }
+})
+
 /* ==================== AUTO-LOAD POR ABA ==================== */
 function onWorkspace(id) {
   if (id === "pesquisa" && !radarLoaded) loadRadar(true)
   if (id === "producao") loadPublishList()
   if (id === "estrategia" && !funilLoaded) loadFunil()
-  if (id === "metas" && !padroesLoaded) loadPadroes(false)
+  if (id === "metas") {
+    if (!padroesLoaded) loadPadroes(false)
+    if (!analyticsLoaded) loadAnalytics()
+  }
+  if (id === "integracoes" && !oauthLoaded) loadOAuthCard()
 }
 window.addEventListener("workspace:change", (e) => onWorkspace(e.detail?.id))
 onWorkspace(window.location.hash.slice(1) || "canal")
