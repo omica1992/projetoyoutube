@@ -481,6 +481,27 @@
     </div>
     <div id="horarios-body" class="strategy-list"><p class="meta">Abra esta aba para carregar a análise.</p></div>
   </article>
+  <article class="card" id="agenda-card" style="margin-top:16px">
+    <div class="card-head">
+      <div>
+        <h2>Agenda de ações e publicações</h2>
+        <p class="meta">Ações e postagens agendadas manualmente ou direto pelo Chat IA.</p>
+      </div>
+      <button class="ghost" id="btn-agenda-refresh" type="button">Atualizar</button>
+    </div>
+    <form id="agenda-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="ag-titulo" type="text" placeholder="Ex: Postar Short de Buraco Negro" required style="flex:2;min-width:180px">
+      <select id="ag-tipo">
+        <option value="postar">Postar Short</option>
+        <option value="roteiro">Escrever roteiro</option>
+        <option value="analise">Analisar vídeo</option>
+        <option value="busca">Pesquisar tema</option>
+      </select>
+      <input id="ag-quando" type="datetime-local">
+      <button class="primary" type="submit">Agendar</button>
+    </form>
+    <div id="agenda-list" class="strategy-list"><p class="meta">Nenhuma ação agendada ainda.</p></div>
+  </article>
 </section>
 
 <!-- ============================ METAS ============================ -->

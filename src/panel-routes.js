@@ -9,11 +9,15 @@ import { buildHorarios } from "./horarios.js"
 import { ytGetVideoComments, ytGetVideosByIds } from "./youtube.js"
 import { getAnalyticsSummary, getOAuthStatus, uploadShortToYouTube } from "./youtube-oauth.js"
 import {
+  addAgendaItem,
   buildRadar,
   buildSrtFromText,
   compareTopVsBottom,
+  deleteAgendaItem,
+  readAgenda,
   readConcorrentes,
   resolveChannelInput,
+  updateAgendaItem,
   writeConcorrentes,
 } from "./extras.js"
 import { askFallback, parseJsonLoose } from "./opencode.js"
@@ -53,6 +57,8 @@ const chatUpload = multer({
 })
 
 const AI_CATALOG = [
+  // Nuvem (fallback automático quando rodando na Vercel sem OpenCode local)
+  { id: "gemini/gemini-2.5-flash", label: "Gemini 2.5 Flash (Nuvem)", group: "Nuvem · Textos / Docs", cap: "text" },
   // Leitura de Vídeo, Imagem & Visão (Multimodal + Áudio via Whisper)
   { id: "opencode/nemotron-3.5-super-vl-free", label: "Nemotron 3.5 Super VL (Free)", group: "Free · Vídeo / Imagem", cap: "media" },
   { id: "opencode-go/gemini-4-argon", label: "Gemini 4 Argon (OpenCode Go)", group: "Go · Vídeo / Imagem", cap: "media" },
@@ -84,17 +90,7 @@ const ALLOWED_IDS = new Set(AI_CATALOG.map((m) => m.id))
 const VOICE_PREVIEW_DIR = path.join(DATA_DIR, "_voice_previews")
 if (!process.env.VERCEL) fs.mkdirSync(VOICE_PREVIEW_DIR, { recursive: true })
 
-// Na Vercel sem AI_API_URL só a Gemini responde: expõe apenas esse modelo.
-const CLOUD_ONLY = Boolean(process.env.VERCEL && !process.env.AI_API_URL)
-const CLOUD_MODEL = {
-  id: "gemini/gemini-2.5-flash",
-  label: "Gemini 2.5 Flash (Nuvem)",
-  group: "Nuvem · Textos / Docs",
-  cap: "text",
-}
-
 function pickModels(requested) {
-  if (CLOUD_ONLY) return [CLOUD_MODEL.id]
   const chosen = ALLOWED_IDS.has(requested) ? requested : MODELS.direcionador
   return [chosen, ...MODELS.direcionadorFallback.filter((m) => m !== chosen)]
 }
@@ -217,7 +213,6 @@ const route = (handler) => async (req, res) => {
 panelRoutes.get(
   "/modelos",
   route(async (_req, res) => {
-    if (CLOUD_ONLY) return res.json({ default: CLOUD_MODEL.id, available: [CLOUD_MODEL] })
     res.json({
       default: MODELS.direcionador,
       available: AI_CATALOG,
@@ -793,6 +788,48 @@ panelRoutes.delete(
 )
 
 panelRoutes.get(
+  "/agenda",
+  route(async (_req, res) => {
+    res.json({ agenda: await readAgenda() })
+  }),
+)
+
+panelRoutes.post(
+  "/agenda",
+  route(async (req, res) => {
+    const titulo = String(req.body?.titulo || "").trim()
+    if (!titulo) return res.status(400).json({ error: "Informe o título da ação." })
+    const out = await addAgendaItem({
+      titulo,
+      tipo: String(req.body?.tipo || "postar"),
+      quando: String(req.body?.quando || ""),
+      detalhes: String(req.body?.detalhes || ""),
+      origem: "manual",
+    })
+    res.json(out)
+  }),
+)
+
+panelRoutes.patch(
+  "/agenda/:id",
+  route(async (req, res) => {
+    const agenda = await updateAgendaItem(req.params.id, {
+      status: req.body?.status,
+      titulo: req.body?.titulo,
+      quando: req.body?.quando,
+    })
+    res.json({ agenda })
+  }),
+)
+
+panelRoutes.delete(
+  "/agenda/:id",
+  route(async (req, res) => {
+    res.json({ agenda: await deleteAgendaItem(req.params.id) })
+  }),
+)
+
+panelRoutes.get(
   "/horarios",
   route(async (req, res) => {
     const overview = await getChannelPublicOverview(HANDLE, CHANNEL_ID)
@@ -1052,12 +1089,28 @@ panelRoutes.post(
       }
     }
 
-    const acervo = await readAcervo()
+    const [acervo, concorrentes, agenda, oauthSt] = await Promise.all([
+      readAcervo(),
+      readConcorrentes().catch(() => []),
+      readAgenda().catch(() => []),
+      getOAuthStatus().catch(() => ({ connected: false })),
+    ])
     const chatId = typeof req.body?.chatId === "string" && req.body.chatId ? req.body.chatId : undefined
     const existingThread = chatId ? acervo.chats.find((c) => c.id === chatId) : null
     const recentChat = (existingThread?.messages || []).slice(-8).map((m) => `${m.role === "user" ? "Criador" : "Direcionador"}: ${m.text}`).join("\n")
     const lastSearches = acervo.buscas.slice(0, 3).map((b) => `- "${b.objetivo}" (${b.results?.length ?? 0} resultados)`).join("\n")
     const lastAnalyses = acervo.analises.slice(0, 3).map((a) => `- ${a.video?.title || a.video?.id}: Promessa="${a.analise?.promessa || ""}"`).join("\n")
+    const lastRoteiros = acervo.roteiros.slice(0, 5).map((r) => `- [id:${r.id}] "${r.pauta || r.titulo || "Roteiro"}" (${r.publishedId ? `publicado: ${r.publishedId}` : "rascunho"})`).join("\n")
+    const pendingAgenda = agenda.filter((a) => a.status !== "concluido").slice(0, 6).map((a) => `- [${a.tipo}] ${a.titulo}${a.quando ? ` (${a.quando})` : ""}`).join("\n")
+
+    let analyticsCtx = ""
+    if (oauthSt.connected) {
+      try {
+        const an = await getAnalyticsSummary()
+        const s = an.summary
+        analyticsCtx = `\n[YOUTUBE ANALYTICS REAL - ÚLTIMOS 28 DIAS]\nViews: ${s.views} | Minutos assistidos: ${s.estimatedMinutesWatched} | Retenção média: ${s.averageViewPercentage.toFixed(1)}% (${Math.round(s.averageViewDuration)}s) | Inscritos ganhos: +${s.subscribersGained}\nTop retenção: ${an.topVideos.slice(0, 4).map((v) => `${v.videoId} (${v.averageViewPercentage.toFixed(1)}%, ${v.views} views)`).join(" | ")}`
+      } catch {}
+    }
 
     let canalResumo = ""
     try {
@@ -1092,7 +1145,11 @@ panelRoutes.post(
 
     const prompt = `Você é o Direcionador Criativo integrado ao painel do @fatonexocuri (FatoNexo).
 ${canalResumo}
+${analyticsCtx}
 ${videoCtx}
+${lastRoteiros ? `\nRoteiros no acervo:\n${lastRoteiros}` : ""}
+${pendingAgenda ? `\nAgenda de ações pendentes:\n${pendingAgenda}` : ""}
+${concorrentes.length ? `\nConcorrentes monitorados no radar: ${concorrentes.map((c) => c.title || c.handle || c.id).join(", ")}` : ""}
 ${lastSearches ? `\nBuscas recentes no acervo:\n${lastSearches}` : ""}
 ${lastAnalyses ? `\nAnálises recentes no acervo:\n${lastAnalyses}` : ""}
 ${recentChat ? `\nHistórico desta conversa:\n${recentChat}` : ""}
@@ -1103,14 +1160,20 @@ Mensagem do criador:
 
 INSTRUÇÕES IMPORTANTES:
 1. Responda em português do Brasil, bem estruturado em Markdown (títulos curtos, listas, negrito).
-2. Sempre que fizer sentido (ou quando o criador pedir para criar um roteiro, buscar canais/vídeos ou montar uma pauta), inclua no FINAL da resposta um bloco JSON opcional exatamente entre \`\`\`studio-action e \`\`\` para executar no painel:
-   - Para salvar/sugerir um roteiro (que já entra como rascunho no painel):
+2. Sempre que o criador pedir para criar, editar, agendar ou executar algo no sistema, inclua no FINAL da resposta um bloco JSON exatamente entre \`\`\`studio-action e \`\`\` para executar automaticamente no painel:
+   - Criar roteiro (salva no acervo):
      {"action":"criar_roteiro","pauta":"...","promessa":"...","contexto":"...","entrega":"...","roteiro":"texto corrido completo da narração"}
-   - Para sugerir uma busca no YouTube:
+   - Editar roteiro existente (use o id da lista acima):
+     {"action":"atualizar_roteiro","id":"ID_DO_ROTEIRO","pauta":"...","promessa":"...","contexto":"...","entrega":"...","roteiro":"texto atualizado"}
+   - Agendar ação ou publicação (salva na Agenda de Estratégia):
+     {"action":"agendar_acao","titulo":"...","tipo":"postar|roteiro|analise|busca","quando":"2026-11-25 18:00","detalhes":"..."}
+   - Monitorar canal concorrente no Radar:
+     {"action":"monitorar_concorrente","canal":"@handle"}
+   - Buscar no YouTube:
      {"action":"buscar","query":"termo curto","searchType":"channel"}
-   - Para sugerir analisar um vídeo específico (ID de 11 caracteres):
+   - Analisar vídeo específico (ID de 11 caracteres):
      {"action":"analisar_video","videoId":"XXXXXXXXXXX"}
-   - Para sugerir uma pauta na fila de Estratégia:
+   - Criar pauta na fila de Estratégia:
      {"action":"criar_pauta","title":"...","promise":"...","context":"...","payoff":"..."}
    Use no máximo UM bloco studio-action por resposta. Não use tabelas Markdown largas; prefira listas.`
 
@@ -1139,6 +1202,35 @@ INSTRUÇÕES IMPORTANTES:
             },
           })
           panelAction = { ...parsed, roteiroId: savedDraft.id, savedDraft }
+        } else if (parsed?.action === "atualizar_roteiro" && parsed.id) {
+          const updated = await updateAcervoItem("roteiros", parsed.id, {
+            pauta: parsed.pauta,
+            roteiro: {
+              titulo: parsed.pauta || "Roteiro atualizado",
+              promessa: parsed.promessa || "",
+              contexto: parsed.contexto || "",
+              entrega: parsed.entrega || "",
+              roteiro: parsed.roteiro || "",
+            },
+          })
+          panelAction = { ...parsed, updated }
+        } else if (parsed?.action === "agendar_acao") {
+          const ag = await addAgendaItem({
+            titulo: parsed.titulo || "Ação agendada pela IA",
+            tipo: parsed.tipo || "postar",
+            quando: parsed.quando || "",
+            detalhes: parsed.detalhes || "",
+            origem: "chat-ia",
+          })
+          panelAction = { ...parsed, agendaItem: ag.item }
+        } else if (parsed?.action === "monitorar_concorrente" && parsed.canal) {
+          const ch = await resolveChannelInput(parsed.canal)
+          const list = await readConcorrentes()
+          if (!list.some((c) => c.id === ch.id)) {
+            list.push(ch)
+            await writeConcorrentes(list)
+          }
+          panelAction = { ...parsed, added: ch }
         } else if (["buscar", "analisar_video", "criar_pauta"].includes(parsed?.action)) {
           panelAction = parsed
         }

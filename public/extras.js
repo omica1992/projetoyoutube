@@ -389,11 +389,85 @@ $("#upload-youtube-form")?.addEventListener("submit", async (e) => {
   }
 })
 
+/* ==================== 9. AGENDA DE AÇÕES (#estrategia) ==================== */
+let agendaLoaded = false
+
+async function loadAgenda() {
+  const box = $("#agenda-list")
+  if (!box) return
+  try {
+    const res = await apiJson("/api/painel/agenda")
+    const list = res.agenda || []
+    if (!list.length) {
+      box.replaceChildren(el("p", "Nenhuma ação agendada. Crie acima ou peça no Chat IA!", "meta"))
+      agendaLoaded = true
+      return
+    }
+    box.replaceChildren(
+      ...list.map((a) => {
+        const d = el("div")
+        d.style.cssText = `padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:10px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;${a.status === "concluido" ? "opacity:.6" : ""}`
+        const left = el("div")
+        left.append(
+          el("strong", `[${a.tipo}] ${a.titulo}`),
+          el("p", `${a.quando || "Sem data"} · origem: ${a.origem}${a.detalhes ? ` · ${a.detalhes}` : ""}`, "meta"),
+        )
+        const right = el("div")
+        right.style.cssText = "display:flex;gap:6px"
+        const doneBtn = el("button", a.status === "concluido" ? "Reabrir" : "Concluir", "ghost")
+        doneBtn.type = "button"
+        doneBtn.onclick = async () => {
+          await apiJson(`/api/painel/agenda/${encodeURIComponent(a.id)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: a.status === "concluido" ? "pendente" : "concluido" }),
+          })
+          loadAgenda()
+        }
+        const delBtn = el("button", "Excluir", "ghost")
+        delBtn.type = "button"
+        delBtn.onclick = async () => {
+          await apiJson(`/api/painel/agenda/${encodeURIComponent(a.id)}`, { method: "DELETE" })
+          loadAgenda()
+        }
+        right.append(doneBtn, delBtn)
+        d.append(left, right)
+        return d
+      }),
+    )
+    agendaLoaded = true
+  } catch (e) {
+    box.replaceChildren(el("p", e.message, "meta"))
+  }
+}
+
+$("#btn-agenda-refresh")?.addEventListener("click", loadAgenda)
+$("#agenda-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault()
+  const titulo = $("#ag-titulo")?.value.trim()
+  if (!titulo) return
+  await apiJson("/api/painel/agenda", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      titulo,
+      tipo: $("#ag-tipo")?.value || "postar",
+      quando: $("#ag-quando")?.value || "",
+    }),
+  })
+  e.currentTarget.reset()
+  toast("Ação agendada!")
+  loadAgenda()
+})
+
 /* ==================== AUTO-LOAD POR ABA ==================== */
 function onWorkspace(id) {
   if (id === "pesquisa" && !radarLoaded) loadRadar(true)
   if (id === "producao") loadPublishList()
-  if (id === "estrategia" && !funilLoaded) loadFunil()
+  if (id === "estrategia") {
+    if (!funilLoaded) loadFunil()
+    if (!agendaLoaded) loadAgenda()
+  }
   if (id === "metas") {
     if (!padroesLoaded) loadPadroes(false)
     if (!analyticsLoaded) loadAnalytics()

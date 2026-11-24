@@ -226,3 +226,68 @@ export function newId() {
   return crypto.randomUUID()
 }
 
+const AGENDA_KEY = "agenda_acoes"
+const AGENDA_FILE = path.join(DATA_DIR, "agenda.json")
+let memAgenda = []
+
+export async function readAgenda() {
+  if (hasSupabase()) {
+    try {
+      const v = await kvGet(AGENDA_KEY)
+      if (Array.isArray(v)) return v
+    } catch {}
+  }
+  if (!process.env.VERCEL) {
+    try {
+      const v = JSON.parse(fs.readFileSync(AGENDA_FILE, "utf8"))
+      if (Array.isArray(v)) return v
+    } catch {}
+  }
+  return memAgenda
+}
+
+async function writeAgenda(list) {
+  memAgenda = list
+  if (hasSupabase()) {
+    try {
+      await kvSet(AGENDA_KEY, list)
+    } catch {}
+    return
+  }
+  if (process.env.VERCEL) return
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true })
+    fs.writeFileSync(AGENDA_FILE, JSON.stringify(list, null, 2), "utf8")
+  } catch {}
+}
+
+export async function addAgendaItem({ titulo, tipo = "postar", quando = "", detalhes = "", origem = "manual" }) {
+  const list = await readAgenda()
+  const item = {
+    id: crypto.randomUUID(),
+    titulo: String(titulo || "Ação agendada").trim(),
+    tipo,
+    quando: String(quando || "").trim(),
+    detalhes: String(detalhes || "").trim(),
+    origem,
+    status: "pendente",
+    createdAt: new Date().toISOString(),
+  }
+  const next = [item, ...list].slice(0, 60)
+  await writeAgenda(next)
+  return { item, agenda: next }
+}
+
+export async function updateAgendaItem(id, patch) {
+  const list = await readAgenda()
+  const next = list.map((a) => (a.id === id ? { ...a, ...patch, updatedAt: new Date().toISOString() } : a))
+  await writeAgenda(next)
+  return next
+}
+
+export async function deleteAgendaItem(id) {
+  const list = (await readAgenda()).filter((a) => a.id !== id)
+  await writeAgenda(list)
+  return list
+}
+
