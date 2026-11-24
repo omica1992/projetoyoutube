@@ -376,7 +376,24 @@ panelRoutes.post(
     if (!videoId) {
       return res.status(400).json({ error: "Informe uma URL ou ID válido de vídeo/Short do YouTube." })
     }
-    const video = await getVideoDetailsAndTranscript(videoId)
+    let video = await getVideoDetailsAndTranscript(videoId)
+    // Se for um vídeo do próprio canal em cache (ex.: na Vercel), enriquece com os dados salvos
+    try {
+      const cat = await getChannelVideosCatalog()
+      const hit = cat.find((s) => s.id === videoId)
+      if (hit) {
+        video = {
+          ...video,
+          title: video.title || hit.title || "",
+          channel: video.channel || "FatoNexo",
+          views: video.views ?? hit.views ?? null,
+          durationSeconds: video.durationSeconds ?? hit.durationSeconds ?? null,
+          description: video.description || hit.description || "",
+          transcript: video.transcript || hit.transcript || "",
+          hasCaptions: Boolean(video.transcript || hit.transcript),
+        }
+      }
+    } catch {}
     const models = pickModels(req.body?.model)
     const ai = await askFallback({
       models,

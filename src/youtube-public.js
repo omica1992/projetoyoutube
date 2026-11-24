@@ -213,14 +213,42 @@ function decodeXmlEntities(s = "") {
  */
 export async function getVideoDetailsAndTranscript(videoId) {
   if (!/^[\w-]{11}$/.test(videoId)) throw new Error("ID de vídeo inválido.")
-  const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-    headers: HEADERS,
-    signal: AbortSignal.timeout(12_000),
-  })
-  if (!res.ok) throw new Error(`YouTube retornou HTTP ${res.status} ao abrir o vídeo.`)
-  const html = await res.text()
-  const pr = extractBalancedJson(html, "var ytInitialPlayerResponse =")
-  const initialData = extractBalancedJson(html, "var ytInitialData =")
+  const [watchRes, oembedRes] = await Promise.all([
+    fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(12_000),
+    }).catch(() => null),
+    fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`, {
+      signal: AbortSignal.timeout(8_000),
+    }).catch(() => null),
+  ])
+
+  const oembed = oembedRes?.ok ? await oembedRes.json().catch(() => null) : null
+  const html = watchRes?.ok ? await watchRes.text().catch(() => "") : ""
+  let pr = html ? extractBalancedJson(html, "var ytInitialPlayerResponse =") : null
+  const initialData = html ? extractBalancedJson(html, "var ytInitialData =") : null
+
+  if (!pr?.videoDetails?.title) {
+    try {
+      const embRes = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+        method: "POST",
+        headers: { "content-type": "application/json", "user-agent": UA },
+        body: JSON.stringify({
+          context: {
+            client: { clientName: "TVHTML5_SIMPLY_EMBEDDED_PLAYER", clientVersion: "2.0", hl: "pt", gl: "BR" },
+            thirdParty: { embedUrl: "https://www.youtube.com/" },
+          },
+          videoId,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (embRes.ok) {
+        const embData = await embRes.json()
+        if (embData?.videoDetails?.title) pr = embData
+      }
+    } catch {}
+  }
+
   const details = pr?.videoDetails || {}
   const micro = pr?.microformat?.playerMicroformatRenderer || {}
   const subText = textOf(collectNodes(initialData, "videoOwnerRenderer")[0]?.subscriberCountText) || ""
@@ -263,8 +291,8 @@ export async function getVideoDetailsAndTranscript(videoId) {
   return {
     id: videoId,
     url: `https://www.youtube.com/shorts/${videoId}`,
-    title: details.title || "",
-    channel: details.author || "",
+    title: details.title || oembed?.title || "",
+    channel: details.author || oembed?.author_name || "",
     channelId: details.channelId || "",
     channelSubscribers: parseCompactNumber(subText),
     channelSubscribersText: subText,
