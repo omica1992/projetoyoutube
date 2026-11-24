@@ -5,6 +5,7 @@ import express from "express"
 import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
+import { buildHorarios } from "./horarios.js"
 import { askFallback, parseJsonLoose } from "./opencode.js"
 import { generateNarration, providerKey, storeProviderKey, verifyGemini, CHANNEL_ID, VOICE_CATALOG } from "./panel-providers.js"
 import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey } from "./youtube.js"
@@ -532,6 +533,36 @@ panelRoutes.post(
       timeoutMs: 90_000,
     })
     res.json({ resposta: ai.text.trim(), model: ai.model })
+  }),
+)
+
+panelRoutes.get(
+  "/horarios",
+  route(async (req, res) => {
+    const overview = await getChannelPublicOverview(HANDLE, CHANNEL_ID)
+    const queries = String(req.query.q || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const data = await buildHorarios({ overview, queries })
+    if (req.query.ai === "1") {
+      try {
+        const ai = await askFallback({
+          models: pickModels(req.query.model),
+          timeoutMs: 40_000,
+          text: `Você é analista de YouTube Shorts do canal @fatonexocuri (nicho: curiosidades/ciência). Fuso: Brasília.
+Dados do canal por período (média de views por Short): ${JSON.stringify(data.own.byPeriod)}
+Melhores Shorts do canal (dia/hora): ${JSON.stringify(data.own.topVideos)}
+Mercado, velocidade (views/hora) por hora de postagem: ${JSON.stringify(data.market.byHour.filter((h) => h.n > 0))}
+Conclusões automáticas: ${data.verdict.join(" ")}
+Responda em português do Brasil, em até 6 linhas: sugira 2 ou 3 horários para TESTAR nas próximas semanas e deixe claro que a amostra é pequena. Não invente números.`,
+        })
+        data.ai = { text: ai.text.trim(), model: ai.model }
+      } catch (error) {
+        data.ai = { error: error instanceof Error ? error.message.slice(0, 200) : "Falha ao gerar recomendação." }
+      }
+    }
+    res.json(data)
   }),
 )
 

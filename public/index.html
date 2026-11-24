@@ -390,6 +390,19 @@
     </div>
     <div id="idea-list" class="kanban"></div>
   </article>
+  <article class="card" id="horarios-card" style="margin-top:16px">
+    <div class="card-head">
+      <div>
+        <h2>Melhor horário para postar</h2>
+        <p class="meta">Canal (horário de publicação × views) comparado ao mercado (velocidade de views por hora). Fuso: Brasília.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="ghost" id="btn-horarios-ai" type="button">Recomendação da IA</button>
+        <button class="primary" id="btn-horarios" type="button">Atualizar</button>
+      </div>
+    </div>
+    <div id="horarios-body" class="strategy-list"><p class="meta">Abra esta aba para carregar a análise.</p></div>
+  </article>
 </section>
 
 <!-- ============================ METAS ============================ -->
@@ -551,5 +564,6 @@
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <script type="module" src="/panel.js"></script>
+<script type="module" src="/horarios.js"></script>
 </body>
 </html>
