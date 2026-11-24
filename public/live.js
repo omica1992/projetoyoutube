@@ -400,8 +400,9 @@ function tick() {
   const status = $("#channel-status")
   const bar = $("#live-bar")
   if (!snap) return
-  const lastPoll = snap.nextPollAt - snap.pollMs + (localRecv - snap.now)
-  const age = Date.now() - lastPoll
+  const baseLastPoll = snap.lastPollAt || (snap.nextPollAt > 0 ? snap.nextPollAt - snap.pollMs : snap.now)
+  const lastPoll = baseLastPoll + (localRecv - snap.now)
+  const age = Math.max(0, Date.now() - lastPoll)
   const err = snap.lastError
   if (snap.current) {
     status.textContent = err

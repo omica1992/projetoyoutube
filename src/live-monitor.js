@@ -42,6 +42,7 @@ let timer = null
 let polling = false
 let lastError = ""
 let lastSaveAt = 0
+let lastSyncAt = 0
 let nextPollAt = 0
 let polls = 0
 
@@ -62,11 +63,12 @@ function save(force = false) {
 }
 
 export async function getSnapshotAsync() {
-  if (hasSupabase() && !state.series.length) {
+  if (hasSupabase() && (!state.series.length || (process.env.VERCEL && Date.now() - lastSyncAt > 10_000))) {
     try {
       const remote = await kvGet("live_state")
       if (remote && Array.isArray(remote.series)) {
         Object.assign(state, remote)
+        lastSyncAt = Date.now()
       }
     } catch {}
   }
@@ -119,6 +121,9 @@ export function getSnapshot() {
     })
     .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
 
+  const now = Date.now()
+  const lastPollAt = last?.lastSeen || last?.t || now
+  const effectiveNext = nextPollAt > 0 ? nextPollAt : lastPollAt + POLL_MS
   return {
     channel: state.channel,
     current: last,
@@ -128,10 +133,11 @@ export function getSnapshot() {
     feed: state.feed.slice(-40).reverse(),
     insight: state.insight,
     pollMs: POLL_MS,
-    nextPollAt,
+    lastPollAt,
+    nextPollAt: effectiveNext,
     lastError,
     polls,
-    now: Date.now(),
+    now,
   }
 }
 
