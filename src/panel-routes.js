@@ -143,7 +143,7 @@ function computeGrowth(history) {
 panelRoutes.use((req, res, next) => {
   const origin = req.get("origin")
   const proto = req.get("x-forwarded-proto")?.split(",")[0].trim() || req.protocol
-  const hostHeader = req.get("x-forwarded-host") || req.get("host") || ""
+  const hostHeader = (req.get("x-forwarded-host") || req.get("host") || "").split(",")[0].trim()
   const currentOrigin = `${proto}://${hostHeader}`
   if (!process.env.VERCEL) {
     const loopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress)
