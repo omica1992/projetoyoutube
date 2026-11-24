@@ -311,6 +311,42 @@ export async function getVideoDetailsAndTranscript(videoId) {
 /**
  * Busca dados públicos de um canal (padrão: @fatonexocuri) + Shorts recentes sem depender do vidIQ.
  */
+const EXACT_VIEWS_TTL_MS = 60_000
+const exactViewsCache = new Map()
+
+async function fetchExactViews(videoId) {
+  const hit = exactViewsCache.get(videoId)
+  if (hit && Date.now() - hit.at < EXACT_VIEWS_TTL_MS) return hit.views
+  try {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!res.ok) return null
+    const html = await res.text()
+    const idx = html.indexOf('"videoDetails"')
+    const m = idx >= 0 ? html.slice(idx, idx + 30_000).match(/"viewCount":"(\d+)"/) : null
+    if (!m) return null
+    const views = Number(m[1])
+    exactViewsCache.set(videoId, { views, at: Date.now() })
+    return views
+  } catch {
+    return null
+  }
+}
+
+async function enrichExactViews(shorts) {
+  const queue = [...shorts]
+  const worker = async () => {
+    while (queue.length) {
+      const s = queue.shift()
+      const exact = await fetchExactViews(s.id)
+      if (typeof exact === "number") s.views = exact
+    }
+  }
+  await Promise.all(Array.from({ length: 6 }, worker))
+}
+
 export async function getChannelPublicOverview(channelRef = "@fatonexocuri", channelId = "UCClrO3uvc5-H6NPc6alEHDw") {
   const pathPart = channelRef.startsWith("@") ? channelRef : `channel/${channelRef}`
   const [pageRes, rssRes] = await Promise.all([
@@ -373,6 +409,9 @@ export async function getChannelPublicOverview(channelRef = "@fatonexocuri", cha
       if (dateById.has(s.id)) s.date = dateById.get(s.id)
     }
   }
+
+  // A aba /shorts só traz contagens arredondadas ("6,1 mil"). Busca o número exato na página do vídeo.
+  await enrichExactViews(shorts)
 
   const validViews = shorts.map((s) => s.views).filter((v) => typeof v === "number" && Number.isFinite(v))
   const totalRecentViews = validViews.reduce((a, b) => a + b, 0)
