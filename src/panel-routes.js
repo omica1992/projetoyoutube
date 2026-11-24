@@ -90,6 +90,7 @@ function extractVideoId(input = "") {
 }
 
 function readHistory() {
+  if (process.env.VERCEL) return []
   try {
     if (!fs.existsSync(HISTORY_FILE)) return []
     const parsed = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"))
@@ -100,7 +101,6 @@ function readHistory() {
 }
 
 function appendHistory(snapshot) {
-  fs.mkdirSync(DATA_DIR, { recursive: true })
   const list = readHistory()
   const today = snapshot.observedAt.slice(0, 10)
   const entry = {
@@ -115,7 +115,10 @@ function appendHistory(snapshot) {
   if (idx >= 0) list[idx] = entry
   else list.push(entry)
   const trimmed = list.slice(-90)
-  fs.writeFileSync(HISTORY_FILE, JSON.stringify(trimmed, null, 2), "utf8")
+  if (!process.env.VERCEL) {
+    fs.mkdirSync(DATA_DIR, { recursive: true })
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(trimmed, null, 2), "utf8")
+  }
   return trimmed
 }
 
