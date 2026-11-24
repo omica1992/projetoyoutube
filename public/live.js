@@ -18,8 +18,10 @@ let lastInsightTry = 0
 let kpisBuilt = false
 let es = null
 
+const normAvatar = (u) => String(u || "").replace("//yt3.ggpht.com/", "//yt3.googleusercontent.com/")
+
 export const getSnapshot = () => snap
-export const getAvatar = () => snap?.channel?.avatar || ""
+export const getAvatar = () => normAvatar(snap?.channel?.avatar)
 
 const KPIS = [
   { key: "subs", label: "Inscritos", icon: "users", value: (c) => c.subs },
@@ -339,12 +341,16 @@ function renderGoal() {
 
 function renderHero() {
   const ch = snap.channel
-  if (ch?.avatar) {
+  const avatarUrl = normAvatar(ch?.avatar)
+  if (avatarUrl) {
     for (const [img, fb] of [["#channel-hero-avatar", "#hero-fallback"], ["#brand-avatar", "#brand-fallback"]]) {
       const i = $(img), f = $(fb)
-      if (i && i.getAttribute("src") !== ch.avatar) i.src = ch.avatar
-      if (i) i.hidden = false
-      if (f) f.hidden = true
+      if (!i || !f) continue
+      i.referrerPolicy = "no-referrer"
+      i.onload = () => { i.hidden = false; f.hidden = true }
+      i.onerror = () => { i.hidden = true; f.hidden = false }
+      if (i.getAttribute("src") !== avatarUrl) i.src = avatarUrl
+      else if (i.complete && i.naturalWidth > 0) { i.hidden = false; f.hidden = true }
     }
   }
   if (ch?.title) $("#hero-title").textContent = ch.title

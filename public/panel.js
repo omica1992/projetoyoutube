@@ -899,8 +899,10 @@ function aiAvatar() {
   const url = getAvatar()
   if (url) {
     const img = document.createElement("img")
+    img.referrerPolicy = "no-referrer"
+    img.alt = ""
+    img.addEventListener("error", () => wrap.replaceChildren(el("b", "FN")), { once: true })
     img.src = url
-    img.alt = "FatoNexo"
     wrap.append(img)
   } else wrap.append(el("b", "FN"))
   return wrap
@@ -912,8 +914,10 @@ function welcomeNode() {
   const url = getAvatar()
   if (url) {
     const img = document.createElement("img")
+    img.referrerPolicy = "no-referrer"
+    img.alt = ""
+    img.addEventListener("error", () => logo.replaceChildren(el("b", "FN")), { once: true })
     img.src = url
-    img.alt = "FatoNexo"
     logo.append(img)
   } else logo.append(el("b", "FN"))
   box.append(logo, el("h3", "Como posso ajudar o FatoNexo hoje?"), el("p", "Eu vejo os números do canal, crio roteiros e pautas, busco canais e entendo áudios, imagens e arquivos que você enviar.", "meta"))

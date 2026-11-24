@@ -93,7 +93,8 @@ export function parseIsoDuration(iso = "") {
 }
 
 function bestThumb(thumbs = {}) {
-  return thumbs.maxres?.url || thumbs.standard?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || ""
+  const raw = thumbs.maxres?.url || thumbs.standard?.url || thumbs.high?.url || thumbs.medium?.url || thumbs.default?.url || ""
+  return raw.replace("//yt3.ggpht.com/", "//yt3.googleusercontent.com/")
 }
 
 export async function ytGetVideosByIds(ids = [], request = fetch) {
