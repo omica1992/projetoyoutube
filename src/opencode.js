@@ -54,6 +54,25 @@ async function askCloudFallback({ model, text, timeoutMs }) {
     return String(body)
   }
 
+  const ocKey = await providerKey("opencode")
+  if (ocKey && !String(model).startsWith("gemini/")) {
+    const modelId = parseModelSpec(model).id
+    const res = await fetch("https://opencode.ai/zen/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${ocKey}` },
+      body: JSON.stringify({ model: modelId, messages: [{ role: "user", content: text }] }),
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err?.error?.message || `OpenCode API HTTP ${res.status}`)
+    }
+    const data = await res.json()
+    const body = data?.choices?.[0]?.message?.content
+    if (!body?.trim()) throw new Error(`Modelo ${model} respondeu vazio`)
+    return String(body)
+  }
+
   const geminiKey = await providerKey("gemini")
   if (geminiKey) {
     const gemModel = process.env.GEMINI_TEXT_MODEL?.trim() || "gemini-2.5-flash"
@@ -70,7 +89,7 @@ async function askCloudFallback({ model, text, timeoutMs }) {
     return String(body)
   }
 
-  throw new Error("Configure AI_API_URL/AI_API_KEY ou conecte sua chave do Google AI Studio em Integrações para usar IA na nuvem.")
+  throw new Error("Conecte sua chave da OpenCode API em Integrações (ou configure AI_API_URL/AI_API_KEY) para usar suas IAs na Vercel.")
 }
 
 export async function ask({ model, text, timeoutMs = 300_000, onTick }) {
@@ -116,7 +135,6 @@ export async function askFallback({ models, text, timeoutMs = 180_000, onTick, l
     } catch (e) {
       errors.push(`${model}: ${e.message.slice(0, 160)}`)
       log?.(`${model} falhou: ${e.message.slice(0, 160)}`)
-      if (process.env.VERCEL && !process.env.AI_API_URL) break
     }
   }
   throw new Error(`Nenhum modelo respondeu (${errors.join(" | ")})`)

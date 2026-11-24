@@ -234,6 +234,7 @@ panelRoutes.get(
       youtube: Boolean(await getYouTubeKeyAsync()),
       gemini: Boolean(await providerKey("gemini")),
       opencode: true,
+      opencodeCloud: Boolean(await providerKey("opencode")),
     })
   }),
 )
@@ -243,15 +244,17 @@ panelRoutes.post(
   route(async (req, res) => {
     const { provider } = req.params
     const key = typeof req.body?.key === "string" ? req.body.key.trim() : ""
-    if (!["youtube", "gemini"].includes(provider) || key.length < 16 || key.length > 400) {
+    if (!["youtube", "gemini", "opencode"].includes(provider) || key.length < 16 || key.length > 400) {
       return res.status(400).json({ error: "Confira se a chave foi copiada por inteiro." })
     }
     if (provider === "youtube") {
       await verifyYouTubeKey(key)
       await saveYouTubeKey(key)
-    } else {
+    } else if (provider === "gemini") {
       await verifyGemini(key)
       await storeProviderKey(provider, key)
+    } else {
+      await storeProviderKey("opencode", key)
     }
     res.json({ connected: true })
   }),

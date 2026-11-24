@@ -2,7 +2,7 @@ import { readFile, writeFile, rename, unlink } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 
-const keys = { vidiq: "VIDIQ_API_KEY", gemini: "GEMINI_API_KEY", youtube: "YOUTUBE_API_KEY" }
+const keys = { vidiq: "VIDIQ_API_KEY", gemini: "GEMINI_API_KEY", youtube: "YOUTUBE_API_KEY", opencode: "OPENCODE_API_KEY" }
 export const VOICE_CATALOG = [
   { id: "Kore", label: "Kore · Firme e clara" },
   { id: "Puck", label: "Puck · Animada e jovem" },
