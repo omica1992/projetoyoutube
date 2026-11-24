@@ -259,6 +259,21 @@
     </details>
     <div class="strategy-list" id="reference-list"></div>
   </article>
+  <article class="card" id="radar-concorrentes-card" style="margin-top:16px">
+    <div class="card-head">
+      <div>
+        <h2>Radar de concorrentes</h2>
+        <p class="meta">Monitore canais do nicho e veja os Shorts recentes com maior velocidade (views/hora).</p>
+      </div>
+      <button class="primary" id="btn-radar-atualizar" type="button">Atualizar radar</button>
+    </div>
+    <form id="radar-add-form" class="inline-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="radar-canal-input" type="text" placeholder="@canal ou URL do YouTube" style="flex:1;min-width:200px">
+      <button class="ghost" type="submit">Monitorar canal</button>
+    </form>
+    <div id="radar-canais" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div id="radar-lista" class="strategy-list"><p class="meta">Abra esta aba ou clique em Atualizar radar.</p></div>
+  </article>
 </section>
 
 <!-- ============================ CHAT ============================ -->
@@ -374,6 +389,38 @@
         <div class="card-head"><h3>Rascunhos e roteiros</h3></div>
         <div id="script-drafts-list" class="strategy-list"></div>
       </article>
+      <article class="card" id="titulo-test-card">
+        <div class="card-head">
+          <div><h3>Testador de Título &amp; Gancho (0–3s)</h3><p class="meta">Gera 4 variações fortes com base nos Top Shorts do canal.</p></div>
+        </div>
+        <div class="strategy-list">
+          <input id="test-titulo-input" type="text" placeholder="Título candidato do Short">
+          <input id="test-gancho-input" type="text" placeholder="Frase inicial (0–3s)">
+          <div class="actions"><button class="primary" id="btn-testar-titulo" type="button">Testar com IA</button></div>
+          <div id="test-titulo-out" class="strategy-list"></div>
+        </div>
+      </article>
+      <article class="card" id="pacote-card">
+        <div class="card-head">
+          <div><h3>Pacote de edição (.srt + Cenas + Prompts)</h3><p class="meta">Puxa o roteiro do editor para baixar legenda .srt e prompts visuais por cena.</p></div>
+          <button class="primary" id="btn-gerar-pacote" type="button">Gerar pacote</button>
+        </div>
+        <div id="pacote-out" class="strategy-list"></div>
+      </article>
+      <article class="card" id="publicar-roteiro-card">
+        <div class="card-head">
+          <div><h3>Fechar ciclo: Roteiro → Short Publicado</h3><p class="meta">Vincule um roteiro salvo ao Short publicado para acompanhar as views reais.</p></div>
+          <button class="ghost" id="btn-refresh-publicar" type="button">Atualizar lista</button>
+        </div>
+        <div class="strategy-list">
+          <select id="pub-roteiro-select"><option value="">Selecione um roteiro salvo…</option></select>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input id="pub-url-input" type="text" placeholder="URL ou ID do Short publicado" style="flex:1;min-width:180px">
+            <button class="primary" id="btn-vincular-short" type="button">Vincular</button>
+          </div>
+          <div id="pub-roteiros-lista" class="strategy-list"></div>
+        </div>
+      </article>
     </div>
   </div>
 </section>
@@ -435,6 +482,19 @@
       <div id="performance-top" class="strategy-list"></div>
     </article>
   </div>
+  <article class="card" id="padroes-card" style="margin-top:16px">
+    <div class="card-head">
+      <div>
+        <h2>Comparador: Top vs. Piores Shorts</h2>
+        <p class="meta">Compara automaticamente os 5 melhores e os 5 piores Shorts do canal.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="ghost" id="btn-padroes-ai" type="button">Regras da IA</button>
+        <button class="primary" id="btn-padroes" type="button">Comparar</button>
+      </div>
+    </div>
+    <div id="padroes-out" class="strategy-list"><p class="meta">Abra esta aba para comparar seus Shorts.</p></div>
+  </article>
 </section>
 
 <!-- ============================ HISTÓRICO ============================ -->
@@ -565,5 +625,6 @@
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <script type="module" src="/panel.js"></script>
 <script type="module" src="/horarios.js"></script>
+<script type="module" src="/extras.js"></script>
 </body>
 </html>

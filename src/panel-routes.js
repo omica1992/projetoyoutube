@@ -6,6 +6,14 @@ import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 import { buildHorarios } from "./horarios.js"
+import {
+  buildRadar,
+  buildSrtFromText,
+  compareTopVsBottom,
+  readConcorrentes,
+  resolveChannelInput,
+  writeConcorrentes,
+} from "./extras.js"
 import { askFallback, parseJsonLoose } from "./opencode.js"
 import { generateNarration, providerKey, storeProviderKey, verifyGemini, CHANNEL_ID, VOICE_CATALOG } from "./panel-providers.js"
 import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey } from "./youtube.js"
@@ -533,6 +541,143 @@ panelRoutes.post(
       timeoutMs: 90_000,
     })
     res.json({ resposta: ai.text.trim(), model: ai.model })
+  }),
+)
+
+panelRoutes.get(
+  "/canal/padroes",
+  route(async (req, res) => {
+    const overview = await getChannelPublicOverview(HANDLE, CHANNEL_ID)
+    const cmp = compareTopVsBottom(overview.recentShorts || [])
+    let ai = null
+    if (req.query.ai === "1" && cmp.sampleSize >= 4) {
+      try {
+        const out = await askFallback({
+          models: pickModels(req.query.model),
+          timeoutMs: 40_000,
+          text: `Analise os padrões do canal @fatonexocuri comparando Top ${cmp.top.length} vs Piores ${cmp.bottom.length} Shorts:
+TOP: ${JSON.stringify(cmp.top.map((s) => ({ title: s.title, views: s.views })))}
+PIORES: ${JSON.stringify(cmp.bottom.map((s) => ({ title: s.title, views: s.views })))}
+Métricas: ${JSON.stringify({ topStats: cmp.topStats, bottomStats: cmp.bottomStats })}
+Responda em português do Brasil, objetivo (máx 6 linhas): 3 regras práticas do que funciona melhor neste canal e 2 erros a evitar.`,
+        })
+        ai = { text: out.text.trim(), model: out.model }
+      } catch (e) {
+        ai = { error: e instanceof Error ? e.message.slice(0, 180) : "Erro na IA" }
+      }
+    }
+    res.json({ ...cmp, ai })
+  }),
+)
+
+panelRoutes.post(
+  "/titulo/testar",
+  route(async (req, res) => {
+    const titulo = String(req.body?.titulo || "").trim()
+    const gancho = String(req.body?.gancho || "").trim()
+    if (!titulo && !gancho) return res.status(400).json({ error: "Informe um título ou gancho para testar." })
+    const overview = await getChannelPublicOverview(HANDLE, CHANNEL_ID).catch(() => null)
+    const topTitles = (overview?.recentShorts || [])
+      .sort((a, b) => (b.views || 0) - (a.views || 0))
+      .slice(0, 5)
+      .map((s) => `${s.title} (${s.views} views)`)
+    const ai = await askFallback({
+      models: pickModels(req.body?.model),
+      timeoutMs: 40_000,
+      text: `Você é especialista em YouTube Shorts de curiosidades (@fatonexocuri).
+Top Shorts do canal: ${topTitles.join(" | ") || "n/d"}
+Avalie este candidato:
+Título: "${titulo}"
+Gancho (0-3s): "${gancho}"
+Devolva APENAS JSON válido:
+{"nota": 0-10, "diagnostico": "1 frase direta", "variacoes": [{"titulo": "...", "gancho": "...", "motivo": "..."}]} (4 variações).`,
+    })
+    let parsed
+    try {
+      parsed = parseJsonLoose(ai.text)
+    } catch {
+      parsed = { nota: null, diagnostico: ai.text.slice(0, 300), variacoes: [] }
+    }
+    res.json({ ...parsed, model: ai.model })
+  }),
+)
+
+panelRoutes.post(
+  "/roteiro/pacote",
+  route(async (req, res) => {
+    const titulo = String(req.body?.titulo || "Short").trim()
+    const texto = String(req.body?.texto || "").trim()
+    if (!texto) return res.status(400).json({ error: "Cole ou gere um roteiro antes de montar o pacote." })
+    const srt = buildSrtFromText(texto)
+    let cenas = []
+    let model = null
+    try {
+      const ai = await askFallback({
+        models: pickModels(req.body?.model),
+        timeoutMs: 45_000,
+        text: `Divida este roteiro de Short em cenas curtas (2-4s cada) para edição no CapCut/editor.
+Título: ${titulo}
+Roteiro:
+${texto}
+Devolva APENAS JSON válido:
+{"cenas": [{"tempo": "0-3s", "fala": "...", "visual": "descrição visual curta", "prompt_imagem": "prompt em inglês para gerar imagem/B-roll"}]}`,
+      })
+      model = ai.model
+      const parsed = parseJsonLoose(ai.text)
+      if (Array.isArray(parsed?.cenas)) cenas = parsed.cenas
+    } catch {}
+    res.json({ titulo, srt, cenas, model })
+  }),
+)
+
+panelRoutes.post(
+  "/roteiro/:id/publicar",
+  route(async (req, res) => {
+    const urlOrId = String(req.body?.urlOrId || "").trim()
+    const videoId = extractVideoId(urlOrId)
+    if (!videoId) return res.status(400).json({ error: "Informe uma URL ou ID válido do Short publicado." })
+    const video = await getVideoDetailsAndTranscript(videoId).catch(() => ({ id: videoId, title: "", views: null }))
+    const updated = await updateAcervoItem("roteiros", req.params.id, {
+      status: "publicado",
+      publishedId: videoId,
+      publishedUrl: `https://www.youtube.com/shorts/${videoId}`,
+      publishedTitle: video.title || "",
+      publishedViews: video.views ?? null,
+      publishedAt: new Date().toISOString(),
+    })
+    if (!updated) return res.status(404).json({ error: "Roteiro não encontrado no acervo." })
+    res.json({ item: updated })
+  }),
+)
+
+panelRoutes.get(
+  "/concorrentes",
+  route(async (req, res) => {
+    const list = await readConcorrentes()
+    const radar = req.query.radar === "1" ? await buildRadar(list) : []
+    res.json({ concorrentes: list, radar })
+  }),
+)
+
+panelRoutes.post(
+  "/concorrentes",
+  route(async (req, res) => {
+    const ch = await resolveChannelInput(req.body?.canal || "")
+    const list = await readConcorrentes()
+    if (!list.some((c) => c.id === ch.id)) {
+      list.push(ch)
+      await writeConcorrentes(list)
+    }
+    res.json({ concorrentes: list, added: ch })
+  }),
+)
+
+panelRoutes.delete(
+  "/concorrentes/:id",
+  route(async (req, res) => {
+    const list = (await readConcorrentes()).filter((c) => c.id !== req.params.id)
+    await writeConcorrentes(list)
+    res.json({ concorrentes: list })
   }),
 )
 
