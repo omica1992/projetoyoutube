@@ -13,7 +13,7 @@ if (!process.env.VERCEL) {
 import { DATA_DIR, PUBLIC_DIR, MODELS, FPS, WIDTH, HEIGHT } from "./config.js"
 import { ask, parseJsonLoose } from "./opencode.js"
 import { buildTrendBrief } from "./trends.js"
-import { getYouTubeKey, saveYouTubeKey, searchYouTube, verifyYouTubeKey, YouTubeApiError } from "./youtube.js"
+import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey, YouTubeApiError } from "./youtube.js"
 import { panelRoutes } from "./panel-routes.js"
 import { promptRoteiro } from "./prompts.js"
 import { transcribeAudio } from "./transcribe.js"
@@ -184,10 +184,20 @@ app.get("/api/modelos", (_req, res) => {
 })
 
 app.use("/api/youtube", (req, res, next) => {
+  const origin = req.get("origin")
+  const proto = String(req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim()
+  const hostHeader = String(req.get("x-forwarded-host") || req.get("host") || "").split(",")[0].trim()
+  const sameOrigin = origin === `${proto}://${hostHeader}`
+  if (process.env.VERCEL) {
+    if ((origin && !sameOrigin) || req.get("sec-fetch-site") === "cross-site" ||
+        (req.method === "POST" && (!sameOrigin || !req.is("application/json")))) {
+      return res.status(403).json({ error: "Requisição não autorizada para a integração do YouTube." })
+    }
+    res.set("Cache-Control", "no-store")
+    return next()
+  }
   const loopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress)
   const host = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(req.get("host") || "")
-  const origin = req.get("origin")
-  const sameOrigin = origin === `${req.protocol}://${req.get("host")}`
   if (!loopback || !host || (origin && !sameOrigin) || req.get("sec-fetch-site") === "cross-site" ||
       (req.method === "POST" && (!sameOrigin || !req.is("application/json")))) {
     return res.status(403).json({ error: "Abra o Studio pelo endereço local para usar a integração do YouTube." })
@@ -196,11 +206,11 @@ app.use("/api/youtube", (req, res, next) => {
   next()
 })
 
-app.get("/api/youtube/conexao", (_req, res) => {
+app.get("/api/youtube/conexao", async (_req, res) => {
   try {
-    res.json({ configured: Boolean(getYouTubeKey()) })
+    res.json({ configured: Boolean(await getYouTubeKeyAsync()) })
   } catch {
-    res.status(500).json({ error: "O Studio não conseguiu ler a configuração local do YouTube." })
+    res.status(500).json({ error: "O Studio não conseguiu ler a configuração do YouTube." })
   }
 })
 
