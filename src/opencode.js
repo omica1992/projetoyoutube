@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import crypto from "node:crypto"
 import { OpenCode } from "@opencode/client"
 import { Service } from "@opencode/client/service"
 import { PROVIDER } from "./config.js"
@@ -56,11 +57,15 @@ async function askCloudFallback({ model, text, timeoutMs }) {
 
   const ocKey = await providerKey("opencode")
   if (ocKey && !String(model).startsWith("gemini/")) {
-    const modelId = parseModelSpec(model).id
-    const res = await fetch("https://opencode.ai/zen/v1/chat/completions", {
+    const spec = parseModelSpec(model)
+    const isGo = spec.providerID === "opencode-go"
+    const url = isGo ? "https://opencode.ai/zen/go/v1/chat/completions" : "https://opencode.ai/zen/v1/chat/completions"
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${ocKey}` }
+    if (isGo) headers["x-opencode-session"] = crypto.randomUUID()
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${ocKey}` },
-      body: JSON.stringify({ model: modelId, messages: [{ role: "user", content: text }] }),
+      headers,
+      body: JSON.stringify({ model: spec.id, messages: [{ role: "user", content: text }] }),
       signal: AbortSignal.timeout(timeoutMs),
     })
     if (!res.ok) {
