@@ -116,6 +116,7 @@ export async function askFallback({ models, text, timeoutMs = 180_000, onTick, l
     } catch (e) {
       errors.push(`${model}: ${e.message.slice(0, 160)}`)
       log?.(`${model} falhou: ${e.message.slice(0, 160)}`)
+      if (process.env.VERCEL && !process.env.AI_API_URL) break
     }
   }
   throw new Error(`Nenhum modelo respondeu (${errors.join(" | ")})`)
