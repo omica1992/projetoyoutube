@@ -410,7 +410,7 @@ button.history-chip:hover { border-color: var(--gold); color: var(--gold-hi); tr
 .chat-workspace { display: grid; grid-template-columns: 276px minmax(0, 1fr); gap: 16px; height: calc(100dvh - 118px); min-height: 520px; }
 .chat-sidebar { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 12px; padding: 14px; border-radius: var(--radius); border: 1px solid var(--line); background: linear-gradient(180deg, rgba(8, 36, 33, 0.8), rgba(4, 20, 18, 0.9)); box-shadow: var(--shadow); min-height: 0; }
 .chat-archive-toggle { padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
-.chat-thread-actions { display: inline-flex; gap: 2px; opacity: 0; transition: opacity 0.2s; }
+.chat-thread-actions { display: inline-flex; gap: 2px; flex-shrink: 0; opacity: 0.72; transition: opacity 0.2s; }
 .chat-thread-item:hover .chat-thread-actions, .chat-thread-item.active .chat-thread-actions { opacity: 1; }
 .chat-thread-item.archived { opacity: 0.65; }
 .page-intro-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -422,10 +422,10 @@ button.history-chip:hover { border-color: var(--gold); color: var(--gold-hi); tr
 .chat-sidebar-top .primary { width: 100%; }
 .chat-sidebar-label { padding: 0 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
 .chat-thread-list { display: grid; gap: 3px; align-content: start; overflow-y: auto; min-height: 0; }
-.chat-thread-item { display: flex; align-items: center; gap: 6px; padding: 10px 11px; border-radius: 12px; border: 1px solid transparent; cursor: pointer; font-size: 13px; color: var(--muted); transition: all 0.2s var(--ease); }
+.chat-thread-item { display: flex; align-items: center; gap: 6px; padding: 10px 11px; border-radius: 12px; border: 1px solid transparent; cursor: pointer; font-size: 13px; color: var(--muted); transition: all 0.2s var(--ease); min-width: 0; }
 .chat-thread-item:hover { background: rgba(255, 255, 255, 0.045); color: var(--text); }
 .chat-thread-item.active { color: var(--gold-hi); background: rgba(242, 181, 63, 0.12); border-color: rgba(242, 181, 63, 0.3); }
-.chat-thread-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.chat-thread-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .chat-thread-del { opacity: 0; border: 0; background: transparent; color: var(--muted); padding: 4px; border-radius: 8px; cursor: pointer; display: grid; transition: opacity 0.2s; }
 .chat-thread-item:hover .chat-thread-del, .chat-thread-item.active .chat-thread-del { opacity: 1; }
 .chat-thread-del:hover { color: var(--danger); background: rgba(255, 122, 122, 0.12); }
