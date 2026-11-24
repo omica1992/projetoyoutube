@@ -9,6 +9,7 @@ import path from "node:path"
 import crypto from "node:crypto"
 import { DATA_DIR } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
+import { ytGetVideosByIds, ytResolveChannel } from "./youtube.js"
 
 const CONCORRENTES_KEY = "concorrentes_monitorados"
 const CONCORRENTES_FILE = path.join(DATA_DIR, "concorrentes.json")
@@ -56,6 +57,10 @@ export async function writeConcorrentes(list) {
 export async function resolveChannelInput(raw = "") {
   const s = String(raw).trim()
   if (!s) throw new Error("Informe o @handle, URL ou ID do canal.")
+  try {
+    const apiCh = await ytResolveChannel(s)
+    if (apiCh) return apiCh
+  } catch {}
   if (/^UC[\w-]{20,}$/.test(s)) {
     const res = await fetch(`https://www.youtube.com/channel/${s}`, { headers: HEADERS, signal: AbortSignal.timeout(10_000) })
     const html = res.ok ? await res.text() : ""
@@ -86,6 +91,36 @@ async function fetchChannelRssTop(ch) {
     const xml = await res.text()
     const entries = [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].slice(0, 5)
     const now = Date.now()
+    const parsed = entries
+      .map((m) => ({
+        id: m[1].match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1],
+        title: m[1].match(/<title>([^<]*)<\/title>/)?.[1] || "",
+        publishedAt: m[1].match(/<published>([^<]+)<\/published>/)?.[1] || "",
+      }))
+      .filter((e) => e.id)
+    const apiVideos = await ytGetVideosByIds(parsed.map((e) => e.id)).catch(() => null)
+    if (Array.isArray(apiVideos)) {
+      const byId = new Map(apiVideos.map((v) => [v.id, v]))
+      return parsed.map((e) => {
+        const v = byId.get(e.id)
+        const pub = v?.publishedAt || e.publishedAt
+        const ageH = pub ? Math.max(0.5, (now - Date.parse(pub)) / 3600_000) : null
+        const views = v?.views ?? null
+        return {
+          id: e.id,
+          title: v?.title || e.title,
+          channelId: ch.id,
+          channelTitle: ch.title || ch.handle || ch.id,
+          url: `https://www.youtube.com/shorts/${e.id}`,
+          publishedAt: pub,
+          hoursAgo: ageH ? Math.round(ageH * 10) / 10 : null,
+          views,
+          likes: v?.likes ?? null,
+          comments: v?.comments ?? null,
+          velocity: typeof views === "number" && ageH ? Math.round(views / Math.max(ageH, 1)) : null,
+        }
+      })
+    }
     const out = await Promise.all(
       entries.map(async (m) => {
         const id = m[1].match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1]
@@ -190,3 +225,4 @@ export function buildSrtFromText(text = "", secPerScene = 3) {
 export function newId() {
   return crypto.randomUUID()
 }
+

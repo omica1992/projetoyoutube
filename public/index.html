@@ -427,6 +427,16 @@
 
 <!-- ============================ ESTRATÉGIA ============================ -->
 <section id="estrategia" class="workspace-view" data-workspace aria-label="Estratégia" hidden>
+  <article class="card" id="funil-card" style="margin-bottom:16px">
+    <div class="card-head">
+      <div>
+        <h2>Funil de produção (Ideia → Publicação)</h2>
+        <p class="meta">Acompanhe da pauta até o Short publicado no YouTube com métricas reais da API oficial.</p>
+      </div>
+      <button class="ghost" id="btn-funil-refresh" type="button">Atualizar funil</button>
+    </div>
+    <div id="funil-body" class="strategy-list"><p class="meta">Carregando funil…</p></div>
+  </article>
   <article class="card">
     <div class="card-head">
       <div>
@@ -583,7 +593,9 @@
       <div class="actions sticky-actions">
         <button class="primary" type="button" id="btn-use-adaptation"><svg class="ic"><use href="#i-pen"/></svg>Criar roteiro com esta adaptação</button>
         <button class="ghost" type="button" id="btn-save-adaptation-idea"><svg class="ic"><use href="#i-compass"/></svg>Salvar na Estratégia</button>
+        <button class="ghost" type="button" id="btn-video-comments">Ler comentários (API)</button>
       </div>
+      <div id="video-comments-box" class="strategy-list" style="margin-top:10px"></div>
     </div>
   </div>
 </aside>

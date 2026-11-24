@@ -218,10 +218,90 @@ async function loadPadroes(ai = false) {
 $("#btn-padroes")?.addEventListener("click", () => loadPadroes(false))
 $("#btn-padroes-ai")?.addEventListener("click", () => loadPadroes(true))
 
+/* ==================== 6. FUNIL COMPLETO (#estrategia) ==================== */
+let funilLoaded = false
+
+function readIdeasLocal() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("studio:fatonexo:planejamento") || "{}")
+    return Array.isArray(raw.ideas) ? raw.ideas : []
+  } catch {
+    return []
+  }
+}
+
+async function loadFunil() {
+  const box = $("#funil-body")
+  if (!box) return
+  box.replaceChildren(el("p", "Carregando funil…", "meta"))
+  try {
+    const data = await apiJson("/api/painel/funil")
+    const ideas = readIdeasLocal()
+    const stages = [
+      { label: "1. Pautas", count: ideas.length, sub: `${ideas.filter((i) => i.status === "Prioridade").length} prioridade(s)` },
+      { label: "2. Roteiros", count: data.counts.roteiros, sub: "salvos no acervo" },
+      { label: "3. Prontos p/ postar", count: data.counts.prontos, sub: "aguardando publicação" },
+      { label: "4. Publicados", count: data.counts.shortsNoCanal, sub: `${data.counts.publicadosVinculados} vinculado(s)` },
+    ]
+    const grid = el("div")
+    grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px"
+    for (const st of stages) {
+      const card = el("div")
+      card.style.cssText = "padding:12px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.03)"
+      const num = el("div", numFmt.format(st.count ?? 0))
+      num.style.cssText = "font-size:24px;font-weight:700;color:#f1c453"
+      card.append(el("div", st.label, "meta"), num, el("div", st.sub, "meta"))
+      grid.append(card)
+    }
+    const actions = el("div")
+    actions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px"
+    actions.append(
+      extLink("Abrir YouTube Studio (Upload)", "https://studio.youtube.com/channel/UCClrO3uvc5-H6NPc6alEHDw/videos/upload"),
+      el("span", `Fonte: ${data.source === "youtube-api-v3" ? "YouTube Data API v3 (oficial)" : "Leitura pública"} · Upload direto exige OAuth 2.0`, "meta"),
+    )
+    box.replaceChildren(grid, actions)
+    if (data.prontos?.length) {
+      const pTitle = el("p", `Prontos para publicar (${data.prontos.length}): ${data.prontos.slice(0, 4).map((p) => p.titulo).join(" · ")}`, "meta")
+      box.append(pTitle)
+    }
+    funilLoaded = true
+  } catch (err) {
+    box.replaceChildren(el("p", `Erro no funil: ${err.message}`, "meta"))
+  }
+}
+
+$("#btn-funil-refresh")?.addEventListener("click", loadFunil)
+
+/* ==================== 7. COMENTÁRIOS DA API NO DRAWER DE VÍDEO ==================== */
+$("#btn-video-comments")?.addEventListener("click", async () => {
+  const urlVal = $("#analyze-url-form input[name='url']")?.value?.trim() || ""
+  const box = $("#video-comments-box")
+  if (!urlVal || !box) return toast("Abra ou informe um vídeo antes", "error")
+  box.replaceChildren(el("p", "Buscando comentários na YouTube Data API v3…", "meta"))
+  try {
+    const res = await apiJson(`/api/painel/video/${encodeURIComponent(urlVal)}/comentarios`)
+    if (!res.comments?.length) {
+      box.replaceChildren(el("p", "Nenhum comentário público neste vídeo.", "meta"))
+      return
+    }
+    box.replaceChildren(
+      ...res.comments.slice(0, 10).map((c) => {
+        const d = el("div")
+        d.style.cssText = "padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:8px"
+        d.append(el("strong", `${c.author} · ${c.likes} 👍`, "meta"), el("p", c.text))
+        return d
+      }),
+    )
+  } catch (err) {
+    box.replaceChildren(el("p", err.message, "meta"))
+  }
+})
+
 /* ==================== AUTO-LOAD POR ABA ==================== */
 function onWorkspace(id) {
   if (id === "pesquisa" && !radarLoaded) loadRadar(true)
   if (id === "producao") loadPublishList()
+  if (id === "estrategia" && !funilLoaded) loadFunil()
   if (id === "metas" && !padroesLoaded) loadPadroes(false)
 }
 window.addEventListener("workspace:change", (e) => onWorkspace(e.detail?.id))

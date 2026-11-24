@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Análise de melhores horários de publicação (fuso de Brasília, UTC-3).
  * - Canal: horário exato de publicação (RSS do YouTube) × views exatas dos Shorts.
  *   As amostras são acumuladas (Supabase/arquivo local) para superar o limite de 15 vídeos do RSS.
@@ -9,6 +9,7 @@ import path from "node:path"
 import { DATA_DIR } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 import { searchYouTubePublic } from "./youtube-public.js"
+import { ytGetVideosByIds } from "./youtube.js"
 
 const TZ_OFFSET_MS = -3 * 3600_000
 const KV_KEY = "horarios_amostras"
@@ -112,10 +113,14 @@ async function collectOwnSamples(overview) {
       changed = true
     }
   }
-  // Atualiza views de amostras antigas que ainda aparecem na aba /shorts
+  // Atualiza com todos os Shorts retornados (a API v3 já traz publishedAt exato para todos os vídeos)
   for (const [id, s] of viewsById) {
-    if (store[id] && typeof s.views === "number" && store[id].views !== s.views) {
-      store[id].views = s.views
+    const prev = store[id]
+    const pub = s.publishedAt || prev?.publishedAt
+    const views = typeof s.views === "number" ? s.views : prev?.views ?? null
+    const title = s.title || prev?.title || ""
+    if (pub && (!prev || prev.views !== views || prev.publishedAt !== pub)) {
+      store[id] = { publishedAt: pub, views, title }
       changed = true
     }
   }
@@ -205,7 +210,28 @@ async function collectMarket(queries) {
     if (candidates.length >= 28) break
   }
   const items = []
-  const queue = [...candidates]
+  const needFetch = []
+  for (const r of candidates) {
+    if (r.publishedAt && typeof r.views === "number") {
+      const publishedMs = Date.parse(r.publishedAt)
+      const ageH = (now - publishedMs) / 3600_000
+      if (Number.isFinite(publishedMs) && ageH >= 0.5 && ageH <= MAX_AGE_H) {
+        items.push({ id: r.id, title: r.title, channel: r.channel, views: r.views, hoursAgo: Math.round(ageH * 10) / 10, hour: toBrt(publishedMs).hour, velocity: Math.round(r.views / Math.max(ageH, 1)) })
+      }
+    } else needFetch.push(r)
+  }
+  const apiBatch = needFetch.length ? await ytGetVideosByIds(needFetch.map((r) => r.id)).catch(() => null) : null
+  if (Array.isArray(apiBatch)) {
+    for (const v of apiBatch) {
+      const publishedMs = Date.parse(v.publishedAt)
+      const ageH = (now - publishedMs) / 3600_000
+      if (Number.isFinite(publishedMs) && typeof v.views === "number" && ageH >= 0.5 && ageH <= MAX_AGE_H) {
+        items.push({ id: v.id, title: v.title, channel: v.channel, views: v.views, hoursAgo: Math.round(ageH * 10) / 10, hour: toBrt(publishedMs).hour, velocity: Math.round(v.views / Math.max(ageH, 1)) })
+      }
+    }
+    return items
+  }
+  const queue = [...needFetch]
   const worker = async () => {
     while (queue.length) {
       const r = queue.shift()

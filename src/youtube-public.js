@@ -1,3 +1,5 @@
+import { searchYouTube, ytGetChannelOverview, ytGetVideosByIds } from "./youtube.js"
+
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
@@ -103,6 +105,10 @@ function searchSpParam(type, _days, order) {
  * Busca pública no YouTube (sem vidIQ e sem precisar de chave de API).
  */
 export async function searchYouTubePublic({ query, type = "video", days = 30, order = "relevance", limit = 20 }) {
+  try {
+    const apiResults = await searchYouTube({ query, type, days, order })
+    if (Array.isArray(apiResults) && apiResults.length) return apiResults.slice(0, limit)
+  } catch {}
   const q = type === "video" && !/#shorts/i.test(query) ? `${query} #shorts` : query
   const sp = searchSpParam(type, Number(days), order)
   const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}${sp ? `&sp=${encodeURIComponent(sp)}` : ""}`
@@ -213,7 +219,8 @@ function decodeXmlEntities(s = "") {
  */
 export async function getVideoDetailsAndTranscript(videoId) {
   if (!/^[\w-]{11}$/.test(videoId)) throw new Error("ID de vídeo inválido.")
-  const [watchRes, oembedRes] = await Promise.all([
+  const [apiVideo, watchRes, oembedRes] = await Promise.all([
+    ytGetVideosByIds([videoId]).then((r) => r?.[0] || null).catch(() => null),
     fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: HEADERS,
       signal: AbortSignal.timeout(12_000),
@@ -291,17 +298,19 @@ export async function getVideoDetailsAndTranscript(videoId) {
   return {
     id: videoId,
     url: `https://www.youtube.com/shorts/${videoId}`,
-    title: details.title || oembed?.title || "",
-    channel: details.author || oembed?.author_name || "",
-    channelId: details.channelId || "",
+    title: apiVideo?.title || details.title || oembed?.title || "",
+    channel: apiVideo?.channel || details.author || oembed?.author_name || "",
+    channelId: apiVideo?.channelId || details.channelId || "",
     channelSubscribers: parseCompactNumber(subText),
     channelSubscribersText: subText,
-    views: details.viewCount ? Number(details.viewCount) : null,
-    durationSeconds: details.lengthSeconds ? Number(details.lengthSeconds) : null,
-    publishDate: micro.publishDate || "",
+    views: apiVideo?.views ?? (details.viewCount ? Number(details.viewCount) : null),
+    likes: apiVideo?.likes ?? null,
+    comments: apiVideo?.comments ?? null,
+    durationSeconds: apiVideo?.durationSeconds ?? (details.lengthSeconds ? Number(details.lengthSeconds) : null),
+    publishDate: apiVideo?.publishedAt || micro.publishDate || "",
     category: micro.category || "",
-    keywords: Array.isArray(details.keywords) ? details.keywords.slice(0, 15) : [],
-    description: details.shortDescription || "",
+    keywords: apiVideo?.keywords?.length ? apiVideo.keywords : (Array.isArray(details.keywords) ? details.keywords.slice(0, 15) : []),
+    description: apiVideo?.description || details.shortDescription || "",
     transcript: transcript.slice(0, 18_000),
     language,
     hasCaptions: Boolean(transcript),
@@ -348,6 +357,10 @@ async function enrichExactViews(shorts) {
 }
 
 export async function getChannelPublicOverview(channelRef = "@fatonexocuri", channelId = "UCClrO3uvc5-H6NPc6alEHDw") {
+  try {
+    const apiOv = await ytGetChannelOverview(channelRef, channelId)
+    if (apiOv) return apiOv
+  } catch {}
   const pathPart = channelRef.startsWith("@") ? channelRef : `channel/${channelRef}`
   const [pageRes, rssRes] = await Promise.all([
     fetch(`https://www.youtube.com/${pathPart}/shorts`, { headers: HEADERS, signal: AbortSignal.timeout(12_000) }),

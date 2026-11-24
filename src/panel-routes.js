@@ -6,6 +6,7 @@ import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 import { buildHorarios } from "./horarios.js"
+import { ytGetVideoComments } from "./youtube.js"
 import {
   buildRadar,
   buildSrtFromText,
@@ -541,6 +542,60 @@ panelRoutes.post(
       timeoutMs: 90_000,
     })
     res.json({ resposta: ai.text.trim(), model: ai.model })
+  }),
+)
+
+panelRoutes.get(
+  "/video/:id/comentarios",
+  route(async (req, res) => {
+    const id = extractVideoId(req.params.id)
+    if (!id) return res.status(400).json({ error: "ID de vídeo inválido." })
+    const comments = await ytGetVideoComments(id, 20)
+    if (comments === null) {
+      return res.status(400).json({ error: "Conecte a chave da YouTube Data API v3 em Integrações para ler comentários." })
+    }
+    res.json({ videoId: id, comments })
+  }),
+)
+
+panelRoutes.get(
+  "/funil",
+  route(async (_req, res) => {
+    const [acervo, overview] = await Promise.all([
+      readAcervo(),
+      getChannelPublicOverview(HANDLE, CHANNEL_ID).catch(() => null),
+    ])
+    const roteiros = acervo.roteiros || []
+    const publicadosRoteiros = roteiros.filter((r) => r.publishedId)
+    const prontos = roteiros.filter((r) => !r.publishedId)
+    const shorts = overview?.recentShorts || []
+    const viewsById = new Map(shorts.map((s) => [s.id, s]))
+    const publicados = publicadosRoteiros.map((r) => {
+      const s = viewsById.get(r.publishedId)
+      return {
+        id: r.id,
+        titulo: r.titulo || r.title || s?.title || r.publishedId,
+        publishedId: r.publishedId,
+        publishedUrl: r.publishedUrl,
+        views: s?.views ?? r.publishedViews ?? null,
+        likes: s?.likes ?? null,
+        comments: s?.comments ?? null,
+      }
+    })
+    res.json({
+      source: overview?.source || "youtube-public",
+      counts: {
+        analises: (acervo.analises || []).length,
+        roteiros: roteiros.length,
+        prontos: prontos.length,
+        publicadosVinculados: publicados.length,
+        shortsNoCanal: overview?.videosCount ?? shorts.length,
+        totalChannelViews: overview?.totalChannelViews ?? overview?.stats?.totalRecentViews ?? null,
+      },
+      prontos: prontos.slice(0, 12).map((r) => ({ id: r.id, titulo: r.titulo || r.title || "Roteiro", createdAt: r.createdAt })),
+      publicados: publicados.slice(0, 12),
+      recentShorts: shorts.slice(0, 8),
+    })
   }),
 )
 
