@@ -642,62 +642,67 @@
 <!-- ============================ INTEGRAÇÕES ============================ -->
 <section id="integracoes" class="workspace-view" data-workspace aria-label="Integrações" hidden>
   <div class="integ-grid">
-    <article class="card conn-card">
-      <div class="card-head"><h3><svg class="ic gold"><use href="#i-sparkles"/></svg> OpenCode · IA Padrão do Sistema</h3><span class="badge-ok">Conectado</span></div>
-      <p class="meta">Escolha a IA padrão do painel. Modelos separados por capacidade: leitura visual (vídeo/imagem) e processamento de documentos/textos. Áudios são transcritos localmente via Whisper.</p>
+    <article class="card conn-card" id="opencode-cloud-card">
+      <div class="card-head"><h3><svg class="ic gold"><use href="#i-sparkles"/></svg> OpenCode &amp; OpenCode Go</h3><span class="badge-ok" id="opencode-conn-badge">Conectado</span></div>
+      <p class="meta">IA principal do sistema (análises, roteiros e Chat). Escolha o modelo padrão ou atualize sua chave da conta OpenCode.</p>
       <div class="stack-form" style="margin-top:14px">
         <label>IA padrão do painel
           <select id="default-ai-model"></select>
         </label>
-        <div class="ai-cap-split">
-          <div class="ai-cap-box">
-            <strong><svg class="ic gold"><use href="#i-film"/></svg> Leitura de Vídeo, Imagem &amp; Áudio</strong>
-            <div id="ai-list-media" class="history-chips"></div>
-          </div>
-          <div class="ai-cap-box">
-            <strong><svg class="ic gold"><use href="#i-file"/></svg> Documentos, Textos &amp; Roteiros</strong>
-            <div id="ai-list-text" class="history-chips"></div>
-          </div>
-        </div>
+        <form class="provider-form stack-form" data-provider="opencode" autocomplete="off" style="margin-top:0">
+          <label>Chave OpenCode (Nuvem / Go)<input name="key" type="password" required minlength="16" maxlength="400" autocomplete="off" placeholder="Cole para trocar a chave"></label>
+          <div class="actions"><button class="primary">Salvar chave</button></div>
+          <p class="meta" id="opencode-status" role="status"></p>
+        </form>
       </div>
     </article>
+
     <article class="card conn-card">
-      <div class="card-head"><h3><svg class="ic gold"><use href="#i-mic"/></svg> Google AI Studio</h3><span class="badge-ok" id="gemini-conn-badge" hidden>Conectado</span></div>
-      <p class="meta">Chave da Gemini API para gerar a narração (TTS).</p>
+      <div class="card-head"><h3><svg class="ic gold"><use href="#i-mic"/></svg> Google AI Studio (Voz)</h3><span class="badge-ok" id="gemini-conn-badge" hidden>Conectado</span></div>
+      <p class="meta">Chave da Gemini API usada apenas para gerar a narração em áudio (TTS) dos roteiros.</p>
       <form class="provider-form stack-form" data-provider="gemini" autocomplete="off">
         <label>Chave Gemini<input name="key" type="password" required minlength="16" maxlength="400" autocomplete="off" placeholder="Cole para trocar a chave"></label>
         <div class="actions"><button class="primary">Validar e salvar</button><a class="link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Abrir AI Studio</a></div>
         <p class="meta" id="gemini-status" role="status"></p>
       </form>
     </article>
+
     <article class="card conn-card">
       <div class="card-head"><h3><svg class="ic gold"><use href="#i-film"/></svg> YouTube Data API v3</h3><span class="badge-ok" id="youtube-conn-badge" hidden>Conectado</span></div>
-      <p class="meta">Opcional. A busca já funciona sem chave; com a API você ganha filtros oficiais.</p>
+      <p class="meta">Leitura oficial de métricas exatas do canal, buscas, concorrentes e comentários públicos.</p>
       <form class="provider-form stack-form" data-provider="youtube" autocomplete="off">
         <label>Chave YouTube<input name="key" type="password" required minlength="16" maxlength="400" autocomplete="off" placeholder="Cole para trocar a chave"></label>
         <div class="actions"><button class="primary">Validar e salvar</button></div>
         <p class="meta" id="youtube-status" role="status"></p>
       </form>
     </article>
-    <article class="card conn-card" id="opencode-cloud-card">
-      <div class="card-head"><h3><svg class="ic gold"><use href="#i-sparkles"/></svg> OpenCode / OpenCode Go API</h3><span class="badge-ok" id="opencode-conn-badge" hidden>Conectado</span></div>
-      <p class="meta">Chave da sua conta OpenCode para rodar seus modelos (MiMo, DeepSeek, Qwen, GPT, Claude) direto na Vercel, deixando o Gemini só para áudio.</p>
-      <form class="provider-form stack-form" data-provider="opencode" autocomplete="off">
-        <label>Chave OpenCode<input name="key" type="password" required minlength="16" maxlength="400" autocomplete="off" placeholder="Cole sua chave da OpenCode"></label>
-        <div class="actions"><button class="primary">Salvar chave</button></div>
-        <p class="meta" id="opencode-status" role="status"></p>
-      </form>
-    </article>
+
     <article class="card conn-card" id="youtube-oauth-card">
       <div class="card-head"><h3><svg class="ic gold"><use href="#i-users"/></svg> Conta do Canal (OAuth 2.0)</h3><span class="badge-ok" id="oauth-conn-badge" hidden>Conectado</span></div>
-      <p class="meta">Libera upload/postagem direta de Shorts e métricas reais de retenção do YouTube Analytics.</p>
-      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
-        <a class="primary" id="btn-oauth-connect" href="/api/youtube/oauth/start" style="text-decoration:none;display:inline-flex;align-items:center;padding:8px 14px;border-radius:10px">Conectar conta do YouTube</a>
+      <p class="meta">Login da conta dona do canal para liberar postagem direta de Shorts e retenção real (YouTube Analytics).</p>
+      <div class="actions" style="margin-top:14px">
+        <a class="primary" id="btn-oauth-connect" href="/api/youtube/oauth/start">Conectar conta do YouTube</a>
         <button class="ghost" id="btn-oauth-disconnect" type="button" hidden>Desconectar</button>
       </div>
-      <p class="meta" id="oauth-status" role="status" style="margin-top:8px"></p>
+      <p class="meta" id="oauth-status" role="status" style="margin-top:10px"></p>
     </article>
   </div>
+
+  <article class="card">
+    <details class="fold">
+      <summary><svg class="ic gold"><use href="#i-sparkles"/></svg> Ver catálogo completo de modelos OpenCode (clique em um modelo para torná-lo padrão)</summary>
+      <div class="two-col" style="margin-top:12px">
+        <div class="ai-cap-box">
+          <strong><svg class="ic gold"><use href="#i-film"/></svg> Leitura de Vídeo, Imagem &amp; Áudio</strong>
+          <div id="ai-list-media" class="history-chips"></div>
+        </div>
+        <div class="ai-cap-box">
+          <strong><svg class="ic gold"><use href="#i-file"/></svg> Documentos, Textos &amp; Roteiros</strong>
+          <div id="ai-list-text" class="history-chips"></div>
+        </div>
+      </div>
+    </details>
+  </article>
 </section>
 
     </main>

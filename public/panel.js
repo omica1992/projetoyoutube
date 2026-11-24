@@ -1329,9 +1329,13 @@ async function loadConnections() {
     badge.className = conn.gemini ? "badge-ok" : "meta"
     $("#gemini-conn-badge").hidden = !conn.gemini
     $("#youtube-conn-badge").hidden = !conn.youtube
+    const ocBadge = $("#opencode-conn-badge")
+    if (ocBadge) ocBadge.hidden = !(conn.opencodeCloud || conn.opencode)
     if (conn.gemini) $("#tts-status").textContent = "Pronto: escolha voz e estilo e gere o áudio."
     if (conn.gemini) $("#gemini-status").textContent = "Chave Gemini configurada e pronta para narração."
     if (conn.youtube) $("#youtube-status").textContent = "Chave YouTube Data API configurada."
+    const ocSt = $("#opencode-status")
+    if (ocSt) ocSt.textContent = conn.opencodeCloud ? "Chave OpenCode configurada na nuvem e ativa." : "Usando servidor local OpenCode (cole sua chave para usar na Vercel)."
   } catch {}
 }
 $$(".provider-form").forEach((form) =>
@@ -1345,7 +1349,7 @@ $$(".provider-form").forEach((form) =>
     try {
       await jsonPost(`/api/painel/conexoes/${provider}`, { key: form.elements.key.value.trim() })
       form.reset()
-      toast(`${provider === "gemini" ? "Google AI Studio" : "YouTube API"} conectado`)
+      toast(`${provider === "gemini" ? "Google AI Studio" : provider === "opencode" ? "OpenCode API" : "YouTube API"} conectado`)
       loadConnections()
     } catch (error) {
       status.textContent = error.message

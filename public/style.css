@@ -587,7 +587,7 @@ audio { width: 100%; border-radius: 12px; filter: sepia(0.3) hue-rotate(110deg);
 
 /* ---------- Histórico & Integrações ---------- */
 .history-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
-.integ-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 18px; align-items: start; }
+.integ-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
 .conn-card .card-head { margin-bottom: 8px; }
 .conn-card form { margin-top: 14px; }
 
@@ -624,6 +624,7 @@ audio { width: 100%; border-radius: 12px; filter: sepia(0.3) hue-rotate(110deg);
 }
 @media (max-width: 860px) {
   .app { grid-template-columns: minmax(0, 1fr); }
+  .integ-grid { grid-template-columns: minmax(0, 1fr); }
   .icon-btn.mobile-nav-btn { display: inline-flex; }
   .rail {
     position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: auto; flex-direction: row; gap: 0;

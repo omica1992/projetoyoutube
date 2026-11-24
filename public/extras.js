@@ -301,6 +301,20 @@ $("#btn-video-comments")?.addEventListener("click", async () => {
 let oauthLoaded = false
 let analyticsLoaded = false
 
+// Exibe retorno do redirecionamento OAuth do Google (?oauth=ok | ?oauth=erro)
+try {
+  const qs = new URLSearchParams(window.location.search)
+  const oauthParam = qs.get("oauth")
+  if (oauthParam) {
+    if (oauthParam === "ok") toast("Conta do YouTube conectada com sucesso!")
+    else toast(qs.get("msg") || "Não foi possível concluir o login do YouTube.", "error")
+    qs.delete("oauth")
+    qs.delete("msg")
+    const clean = `${window.location.pathname}${qs.toString() ? `?${qs}` : ""}${window.location.hash}`
+    history.replaceState(null, "", clean)
+  }
+} catch {}
+
 async function loadOAuthCard() {
   const badge = $("#oauth-conn-badge")
   const btnConn = $("#btn-oauth-connect")
@@ -517,4 +531,5 @@ function onWorkspace(id) {
   if (id === "integracoes" && !oauthLoaded) loadOAuthCard()
 }
 window.addEventListener("workspace:change", (e) => onWorkspace(e.detail?.id))
+loadOAuthCard()
 onWorkspace(window.location.hash.slice(1) || "canal")

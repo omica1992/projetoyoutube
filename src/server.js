@@ -185,6 +185,11 @@ app.get("/api/modelos", (_req, res) => {
 })
 
 app.use("/api/youtube", (req, res, next) => {
+  const isOAuthNav = req.method === "GET" && /^\/oauth\/(start|callback)\b/.test(req.path)
+  if (isOAuthNav) {
+    res.set("Cache-Control", "no-store")
+    return next()
+  }
   const origin = req.get("origin")
   const proto = String(req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim()
   const hostHeader = String(req.get("x-forwarded-host") || req.get("host") || "").split(",")[0].trim()
@@ -237,13 +242,13 @@ app.get("/api/youtube/oauth/start", async (req, res) => {
 
 app.get("/api/youtube/oauth/callback", async (req, res) => {
   const code = typeof req.query.code === "string" ? req.query.code : ""
-  if (!code) return res.redirect("/#integracoes?oauth=erro")
+  if (!code) return res.redirect("/?oauth=erro#integracoes")
   try {
     await exchangeCode(code, requestOrigin(req))
-    res.redirect("/#integracoes?oauth=ok")
+    res.redirect("/?oauth=ok#integracoes")
   } catch (e) {
     const msg = encodeURIComponent(e instanceof Error ? e.message.slice(0, 140) : "Erro OAuth")
-    res.redirect(`/#integracoes?oauth=erro&msg=${msg}`)
+    res.redirect(`/?oauth=erro&msg=${msg}#integracoes`)
   }
 })
 
