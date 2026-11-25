@@ -45,7 +45,7 @@ if (!process.env.VERCEL) {
     }
     next()
   })
-  app.get(["/", "/criar.html", "/studio.html"], (_req, res) => {
+  app.get(["/", "/index.html", "/criar.html", "/studio.html"], (_req, res) => {
     const assets = ["studio-ui.js", "studio-ui.css", "studio-kit-preview.jpg"]
     const revision = assets.map((file) => fs.statSync(path.join(PUBLIC_DIR, file)).mtime.getTime().toString(36)).join("-")
     const document = fs.readFileSync(path.join(PUBLIC_DIR, "studio.html"), "utf8")
@@ -287,7 +287,7 @@ app.get("/api/youtube/oauth/callback", async (req, res) => {
   const saved = /(?:^|;\s*)studio_oauth=([a-f0-9]{24})\.(criar|canais|painel)(?:;|$)/.exec(req.get("cookie") ?? "")
   const multiple = saved?.[2] === "canais"
   const studio = saved?.[2] === "criar" || multiple
-  const target = studio ? "/criar.html" : "/index.html"
+  const target = studio ? "/criar.html" : "/painel.html"
   const hash = multiple ? "#canais" : studio ? "" : "#integracoes"
   res.clearCookie("studio_oauth", { path: "/api/youtube/oauth/callback" })
   if (!code || !saved || saved[1] !== req.query.state || (studio && !isLocalStudio(req, true))) {
