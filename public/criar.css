@@ -1,0 +1,56 @@
+:root{font-family:Inter,system-ui,sans-serif;color:#1c2638;background:#f7f5ef;color-scheme:light;--ink:#172135;--orange:#f7a928;--line:#deddd6;--muted:#526077}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0}
+a{color:inherit}
+button,select,input,textarea{font:inherit}
+button,a,select,summary{touch-action:manipulation}
+.bar{min-height:70px;padding:12px max(5vw,20px);display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ink);color:#fff}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-size:19px;font-weight:800;white-space:nowrap}
+.brand small{font-size:12px;color:#bac5d8;font-weight:500}
+.level{width:35px;height:16px;background:#f7a928;border-radius:4px;display:grid;place-items:center;rotate:-12deg}
+.level i{width:13px;height:8px;border:2px solid var(--ink);border-radius:7px;position:relative}
+.level i::after{content:"";position:absolute;left:4px;top:0;height:4px;border-right:1px solid var(--ink)}
+.muted-link{font-size:14px;text-underline-offset:4px}
+main{width:min(1100px,calc(100% - 36px));margin:42px auto 72px}
+.heading,.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.heading{justify-content:space-between;margin-bottom:22px}
+.eyebrow{margin:0 0 6px;color:#8d4d00;text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:850}
+h1,h2,p{margin:0}
+h1{font-size:clamp(32px,6vw,56px);letter-spacing:-.055em;line-height:1.06}
+h2{font-size:20px;letter-spacing:-.025em}
+.projects select{max-width:min(270px,65vw)}
+.card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:clamp(16px,3vw,26px)}
+.brief,.sections,.sections .card,.preview{display:grid;gap:14px}
+label{display:grid;gap:6px;font-size:14px;font-weight:700}
+.actions label,.projects{display:flex;align-items:center;gap:8px}
+textarea,input,select{border:1px solid #bcbfc1;border-radius:8px;background:#fff;color:var(--ink);padding:10px 12px;min-width:0}
+textarea{width:100%;resize:vertical;line-height:1.56;margin-top:3px}
+button,.primary,.secondary{min-height:42px;padding:10px 14px;border:1px solid transparent;border-radius:8px;text-decoration:none;font-weight:750;display:inline-flex;align-items:center;justify-content:center;text-align:center}
+button{cursor:pointer}
+.primary{background:var(--ink);color:#fff}
+.brief .primary{background:var(--orange);color:var(--ink)}
+.secondary{background:#fff;color:var(--ink);border-color:var(--line)}
+.secondary[aria-pressed="true"]{border-color:#9a590b;background:#fff2d7}
+button:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:3px solid #aa5700;outline-offset:3px}
+.steps{display:flex;gap:10px 22px;flex-wrap:wrap;padding:18px 0}
+.steps a{font-size:14px;text-decoration:none;color:var(--muted);font-weight:650}
+.steps span{display:inline-grid;place-items:center;width:23px;height:23px;border:1px solid var(--line);border-radius:50%;margin-right:4px}
+.steps [data-complete] span{background:#e3f1e7;color:#17452e;border-color:#b9d5c4}
+.production{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,310px);gap:18px;align-items:start}
+.preview{position:sticky;top:18px}
+.screen{aspect-ratio:9/16;background:var(--ink);border-radius:10px;display:grid;place-items:center;text-align:center;color:#dbe4f2;overflow:hidden}
+.screen p{max-width:140px;font-size:14px}
+.screen iframe,.screen video{border:0;width:100%;height:100%;min-height:0}
+.muted{color:var(--muted);font-size:14px;line-height:1.5}
+audio{width:100%}
+summary{cursor:pointer;font-size:14px}
+.status{border-radius:9px;background:#fff1d6;color:#523308;padding:10px 14px;margin:0 0 14px;display:grid;gap:6px;position:sticky;top:8px;z-index:2}
+.status.error{background:#fce4e1;color:#802b21}
+progress{width:100%;height:8px;accent-color:#a56113}
+dialog{border:0;padding:0;border-radius:15px;max-width:min(490px,calc(100% - 36px))}
+dialog::backdrop{background:#172135b5}
+dialog form{display:grid;gap:14px}
+.sr-only{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+@media(max-width:720px){main{margin-top:27px}.production{grid-template-columns:1fr}.preview{position:static}.screen{width:min(100%,290px);margin:auto}.bar .muted-link{font-size:12px}}

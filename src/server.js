@@ -22,6 +22,8 @@ import { audioDuration, buildChunks, buildTimeline } from "./timeline.js"
 import { planejarDirecao } from "./direcao.js"
 import { gerarHtmlComIa, writeEngineHtml, parseRoteiro } from "./htmlgen.js"
 import { captureFrames, encodeMp4, findChrome } from "./render.js"
+import { createRoutes, isLocalStudio, studioRequestOrigin } from "./create-routes.js"
+import { beginChannelConfirmation } from "./studio-channels.js"
 
 const app = express()
 app.set("trust proxy", 1)
@@ -34,7 +36,30 @@ if (!process.env.VERCEL) {
 }
 
 app.use(express.json({ limit: "8mb" }))
+if (!process.env.VERCEL) {
+  app.use((req, res, next) => {
+    const origin = studioRequestOrigin(req)
+    if (!origin) return res.sendStatus(403)
+    if (origin.startsWith("https:") && !/^(?:\/$|\/criar\.html$|\/studio(?:\.html|-ui\.(?:js|css)|-kit-preview\.jpg|-(?:banner|concept|progress)\.webp)$|\/api\/criar(?:\/|$)|\/api\/jobs\/|\/api\/youtube\/oauth\/(?:start|callback)$|\/p\/fdn-)/.test(req.path)) {
+      return res.sendStatus(404)
+    }
+    next()
+  })
+  app.get(["/", "/criar.html", "/studio.html"], (_req, res) => {
+    const assets = ["studio-ui.js", "studio-ui.css", "studio-kit-preview.jpg"]
+    const revision = assets.map((file) => fs.statSync(path.join(PUBLIC_DIR, file)).mtime.getTime().toString(36)).join("-")
+    const document = fs.readFileSync(path.join(PUBLIC_DIR, "studio.html"), "utf8")
+    res.set("Cache-Control", "no-store").type("html").send(document.replaceAll("__STUDIO_REVISION__", revision))
+  })
+}
 app.use(express.static(PUBLIC_DIR))
+app.use("/p/:id", (req, res, next) => {
+  if (req.params.id.startsWith("fdn-")) {
+    if (!isLocalStudio(req)) return res.sendStatus(403)
+    if (studioRequestOrigin(req)?.startsWith("https:") && !/^\/(?:[\w-]+\.(?:wav|mp4)|capa-editorial\.jpg)$/i.test(req.path)) return res.sendStatus(404)
+  }
+  next()
+})
 app.use("/p", express.static(DATA_DIR))
 app.use("/api/painel", panelRoutes)
 
@@ -101,7 +126,7 @@ function saveProject(p) {
 function loadProjects() {
   if (!fs.existsSync(DATA_DIR)) return
   for (const entry of fs.readdirSync(DATA_DIR, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.name.startsWith("_")) continue
+    if (!entry.isDirectory() || /^[._]/.test(entry.name)) continue
     const file = path.join(DATA_DIR, entry.name, "projeto.json")
     if (!fs.existsSync(file)) continue
     try {
@@ -116,11 +141,12 @@ function publicProject(p) {
   return {
     ...p,
     urls: {
+      cover: fs.existsSync(path.join(DATA_DIR, p.id, "capa-editorial.jpg")) ? `${base}/capa-editorial.jpg` : null,
       audio: p.audio ? `${base}/${p.audio}` : null,
-      html: p.htmlFonte ? `${base}/video.html` : null,
+      html: p.htmlFonte ? `${base}/${p.html || "video.html"}` : null,
       mp4: p.mp4 ? `${base}/${p.mp4}` : null,
     },
-    videoHtmlUrl: p.htmlFonte ? `${base}/video.html` : null,
+    videoHtmlUrl: p.htmlFonte ? `${base}/${p.html || "video.html"}` : null,
   }
 }
 
@@ -130,6 +156,12 @@ function getProject(id) {
   const p = projects.get(id)
   if (!p) throw Object.assign(new Error("Projeto não encontrado"), { status: 404 })
   return p
+}
+
+function getLegacyProject(id) {
+  const project = getProject(id)
+  if (project.studio) throw Object.assign(new Error("Abra este projeto no estúdio de criação."), { status: 409 })
+  return project
 }
 
 function slugify(s) {
@@ -159,6 +191,8 @@ function toMp3(input, output) {
 }
 
 /* ---------------------------------- rotas --------------------------------- */
+
+app.use("/api/criar", createRoutes({ projects, projectDir, publicProject, createJob, startJob, slugify }))
 
 app.get("/api/health", async (_req, res) => {
   res.json({
@@ -233,8 +267,16 @@ app.get("/api/youtube/oauth/status", async (_req, res) => {
 
 app.get("/api/youtube/oauth/start", async (req, res) => {
   try {
-    const url = await getAuthUrl(requestOrigin(req))
-    res.redirect(url)
+    const multiple = req.query.canais === "1"
+    const studio = req.query.criar === "1" || multiple
+    if (studio && !isLocalStudio(req)) return res.status(403).send("Abra o Studio pelo endereço local.")
+    if (!studio && studioRequestOrigin(req)?.startsWith("https:")) return res.sendStatus(404)
+    const url = new URL(await getAuthUrl(studio ? studioRequestOrigin(req) : requestOrigin(req), { chooseAccount: multiple }))
+    res.cookie("studio_oauth", `${url.searchParams.get("state")}.${multiple ? "canais" : studio ? "criar" : "painel"}`, {
+      httpOnly: true, sameSite: "lax", secure: req.secure || studioRequestOrigin(req)?.startsWith("https:"), maxAge: 10 * 60 * 1000,
+      path: "/api/youtube/oauth/callback",
+    })
+    res.redirect(url.href)
   } catch (e) {
     res.status(400).send(e instanceof Error ? e.message : "Erro ao iniciar OAuth.")
   }
@@ -242,13 +284,25 @@ app.get("/api/youtube/oauth/start", async (req, res) => {
 
 app.get("/api/youtube/oauth/callback", async (req, res) => {
   const code = typeof req.query.code === "string" ? req.query.code : ""
-  if (!code) return res.redirect("/?oauth=erro#integracoes")
+  const saved = /(?:^|;\s*)studio_oauth=([a-f0-9]{24})\.(criar|canais|painel)(?:;|$)/.exec(req.get("cookie") ?? "")
+  const multiple = saved?.[2] === "canais"
+  const studio = saved?.[2] === "criar" || multiple
+  const target = studio ? "/criar.html" : "/index.html"
+  const hash = multiple ? "#canais" : studio ? "" : "#integracoes"
+  res.clearCookie("studio_oauth", { path: "/api/youtube/oauth/callback" })
+  if (!code || !saved || saved[1] !== req.query.state || (studio && !isLocalStudio(req, true))) {
+    return res.redirect(`${target}?oauth=erro${hash}`)
+  }
   try {
-    await exchangeCode(code, requestOrigin(req))
-    res.redirect("/?oauth=ok#integracoes")
+    if (multiple) {
+      const pending = await beginChannelConfirmation(code, studioRequestOrigin(req))
+      return res.redirect(`${target}#conectar/${pending}`)
+    }
+    await exchangeCode(code, studio ? studioRequestOrigin(req) : requestOrigin(req), studio)
+    res.redirect(`${target}?oauth=ok${hash}`)
   } catch (e) {
     const msg = encodeURIComponent(e instanceof Error ? e.message.slice(0, 140) : "Erro OAuth")
-    res.redirect(`/?oauth=erro&msg=${msg}#integracoes`)
+    res.redirect(`${target}?oauth=erro&msg=${msg}${hash}`)
   }
 })
 
@@ -341,8 +395,9 @@ app.post("/api/roteiro", (req, res) => {
 app.post("/api/projetos/:id/audio", upload.single("audio"), (req, res) => {
   let project
   try {
-    project = getProject(req.params.id)
+    project = getLegacyProject(req.params.id)
   } catch (e) {
+    if (req.file) fs.rmSync(req.file.path, { force: true })
     return res.status(e.status ?? 500).json({ error: e.message })
   }
   if (!req.file) return res.status(400).json({ error: "Envie o arquivo no campo 'audio'" })
@@ -427,7 +482,7 @@ app.post("/api/projetos/:id/audio", upload.single("audio"), (req, res) => {
 app.post("/api/projetos/:id/html", (req, res) => {
   let project
   try {
-    project = getProject(req.params.id)
+    project = getLegacyProject(req.params.id)
   } catch (e) {
     return res.status(e.status ?? 500).json({ error: e.message })
   }
@@ -471,7 +526,7 @@ app.post("/api/projetos/:id/html", (req, res) => {
 app.post("/api/projetos/:id/render", (req, res) => {
   let project
   try {
-    project = getProject(req.params.id)
+    project = getLegacyProject(req.params.id)
   } catch (e) {
     return res.status(e.status ?? 500).json({ error: e.message })
   }
@@ -528,12 +583,12 @@ app.post("/api/projetos/:id/render", (req, res) => {
 })
 
 app.get("/api/projetos", (_req, res) => {
-  res.json([...projects.values()].map(publicProject))
+  res.json([...projects.values()].filter((project) => !project.studio).map(publicProject))
 })
 
 app.get("/api/projetos/:id", (req, res) => {
   try {
-    res.json(publicProject(getProject(req.params.id)))
+    res.json(publicProject(getLegacyProject(req.params.id)))
   } catch (e) {
     res.status(e.status ?? 500).json({ error: e.message })
   }
@@ -541,14 +596,15 @@ app.get("/api/projetos/:id", (req, res) => {
 
 app.get("/api/jobs/:id", (req, res) => {
   const job = jobs.get(req.params.id)
-  if (!job) return res.status(404).json({ error: "Job não encontrado" })
+  if (studioRequestOrigin(req)?.startsWith("https:") && !job?.localOnly) return res.sendStatus(404)
+  if (!job || (job.localOnly && !isLocalStudio(req))) return res.status(404).json({ error: "Job não encontrado" })
   res.json(job)
 })
 
 export default app
 
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
+  app.listen(PORT, "localhost", () => {
     console.log(`\n  Studio Shorts rodando em http://localhost:${PORT}\n`)
     console.log(`  Modelos: roteiro=${MODELS.roteiro}  direção=${MODELS.direcao}  html=${MODELS.html}`)
     console.log(`  ffmpeg: ${ffmpegPath}`)

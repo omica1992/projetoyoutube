@@ -12,9 +12,13 @@ def main():
     language = sys.argv[3] if len(sys.argv) > 3 else "pt"
 
     from faster_whisper import WhisperModel
+    from huggingface_hub.errors import LocalEntryNotFoundError
 
     print(f"carregando modelo {model_size}...", file=sys.stderr, flush=True)
-    model = WhisperModel(model_size, device="cpu", compute_type="int8")
+    try:
+        model = WhisperModel(model_size, device="cpu", compute_type="int8", local_files_only=True)
+    except LocalEntryNotFoundError:
+        model = WhisperModel(model_size, device="cpu", compute_type="int8")
 
     print("transcrevendo...", file=sys.stderr, flush=True)
     segments, info = model.transcribe(

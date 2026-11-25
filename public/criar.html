@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172135">
+  <title>Fora do Nível Studio</title>
+  <link rel="stylesheet" href="/criar.css">
+  <script>
+    const legacyPages = ["canal", "pesquisa", "chat", "producao", "estrategia", "metas", "historico", "integracoes"]
+    if (location.pathname === "/" && legacyPages.includes(location.hash.slice(1))) location.replace("/index.html" + location.search + location.hash)
+  </script>
+  <script type="module" src="/criar.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="/criar.html"><span class="level" aria-hidden="true"><i></i></span>Fora do Nível <small>Studio</small></a>
+    <a class="muted-link" href="/index.html#canal">Painel completo ↗</a>
+  </header>
+  <main>
+    <div class="heading">
+      <div><p class="eyebrow">Engenharia do dia a dia em 3D</p><h1>Criar um Short</h1></div>
+      <label class="projects">Projetos <select id="projects"><option value="">Novo projeto</option></select></label>
+    </div>
+    <form id="brief" class="card brief">
+      <label for="topic">Qual é a ideia do vídeo?</label>
+      <textarea id="topic" rows="3" maxlength="6000" required placeholder="Ex.: Como um prédio resiste a um terremoto? Mostre o mascote testando soluções até chegar aos isoladores sísmicos."></textarea>
+      <div class="actions">
+        <label>Duração <select id="duration"><option value="60">60 s</option><option value="90" selected>90 s</option><option value="120">120 s</option><option value="150">150 s</option></select></label>
+        <button type="submit" class="primary" data-action>Gerar roteiro com IA</button>
+        <button type="button" id="manual" class="secondary" data-action>Colar meu roteiro</button>
+      </div>
+    </form>
+    <nav aria-label="Etapas" class="steps">
+      <a href="#roteiro"><span>1</span> Roteiro</a><a href="#narracao"><span>2</span> Narração</a>
+      <a href="#animacao"><span>3</span> Animação</a><a href="#publicacao"><span>4</span> Publicação</a>
+    </nav>
+    <div class="status" id="status-box" hidden>
+      <p id="status" role="status"></p>
+      <progress id="progress" max="100" hidden aria-label="Progresso da etapa"></progress>
+    </div>
+    <div id="production" class="production" hidden>
+      <div class="sections">
+        <section class="card" id="roteiro">
+          <h2>Roteiro</h2>
+          <label>Título <input id="title" maxlength="100" placeholder="Título do vídeo"></label>
+          <div id="titles" class="actions"></div>
+          <label>Narração <textarea id="script" rows="12" maxlength="5000" placeholder="Cole ou edite o texto que será narrado."></textarea></label>
+          <details id="review" hidden><summary>Pontos técnicos para conferir</summary><ul id="claims"></ul></details>
+          <details><summary>Descrição do vídeo</summary><label class="sr-only" for="description">Descrição</label><textarea id="description" rows="4" maxlength="5000"></textarea></details>
+        </section>
+        <section class="card" id="narracao">
+          <h2>Narração</h2>
+          <div class="actions">
+            <label>Voz <select id="voice"></select></label>
+            <button id="narrate" type="button" class="primary" data-action>Gerar narração</button>
+            <a id="audio-config" href="/index.html#integracoes" hidden>Configurar Gemini ↗</a>
+          </div>
+          <audio id="audio" controls preload="metadata" hidden></audio>
+          <a id="audio-download" class="muted-link" download hidden>Baixar áudio ↓</a>
+        </section>
+        <section class="card" id="animacao">
+          <h2>Animação</h2>
+          <p class="muted">Cria cenas 3D e exporta um MP4 vertical com a narração e as legendas sincronizadas.</p>
+          <p class="muted" id="basic-scenes" hidden>A IA de cenas estava indisponível. Esta prévia usa cenas 3D básicas.</p>
+          <div class="actions">
+            <button id="animate" type="button" class="primary" data-action>Criar animação e vídeo</button>
+            <a id="download" class="secondary" download hidden>Baixar MP4 ↓</a>
+          </div>
+        </section>
+        <section class="card" id="publicacao">
+          <h2>Publicação</h2>
+          <p class="muted" id="channel">O envio é liberado quando o vídeo fica pronto.</p>
+          <div class="actions">
+            <a id="connect" class="secondary" href="/api/youtube/oauth/start?criar=1" hidden>Conectar YouTube ↗</a>
+            <label id="visibility-label" hidden>Visibilidade <select id="visibility"><option value="public">Público</option><option value="unlisted">Não listado</option><option value="private">Privado</option></select></label>
+            <button id="publish" type="button" class="primary" data-action hidden>Enviar ao YouTube</button>
+            <a id="published" class="secondary" target="_blank" rel="noopener" hidden>Abrir no YouTube ↗</a>
+          </div>
+        </section>
+      </div>
+      <aside class="card preview" aria-label="Prévia do Short">
+        <h2>Prévia</h2>
+        <div class="screen">
+          <p id="empty-preview">Sua animação aparece aqui.</p>
+          <iframe id="preview" title="Animação HTML 3D" hidden></iframe>
+          <video id="video" controls playsinline preload="metadata" hidden></video>
+        </div>
+        <a id="html-link" class="muted-link" target="_blank" rel="noopener" hidden>Abrir animação HTML ↗</a>
+      </aside>
+    </div>
+    <dialog id="confirm">
+      <form method="dialog" class="card">
+        <h2>Enviar ao YouTube</h2>
+        <p id="confirmation"></p>
+        <div class="actions"><button value="cancel" class="secondary" autofocus>Voltar</button><button value="publish" class="primary">Confirmar envio</button></div>
+      </form>
+    </dialog>
+  </main>
+</body>
+</html>

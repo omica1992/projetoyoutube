@@ -5,12 +5,13 @@
 import fs from "node:fs"
 import path from "node:path"
 import crypto from "node:crypto"
-import { DATA_DIR } from "./config.js"
+import { ROOT } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 
 const TOKENS_KEY = "oauth:youtube_tokens"
 const CLIENT_KEY = "oauth:google_client"
-const LOCAL_TOKEN_FILE = path.join(path.dirname(DATA_DIR), ".youtube-oauth.json")
+const LOCAL_TOKEN_FILE = path.join(ROOT, ".youtube-oauth.json")
+const STUDIO_TOKEN_FILE = path.join(ROOT, ".youtube-fora-do-nivel.json")
 
 const SCOPES = [
   "https://www.googleapis.com/auth/youtube.readonly",
@@ -31,8 +32,8 @@ export async function getOAuthClientConfig() {
   return null
 }
 
-async function readTokens() {
-  if (hasSupabase()) {
+async function readTokens(studio = false) {
+  if (!studio && hasSupabase()) {
     try {
       const row = await kvGet(TOKENS_KEY)
       if (row?.refresh_token || row?.access_token) return row
@@ -40,13 +41,19 @@ async function readTokens() {
   }
   if (!process.env.VERCEL) {
     try {
-      return JSON.parse(fs.readFileSync(LOCAL_TOKEN_FILE, "utf8"))
+      return JSON.parse(fs.readFileSync(studio ? STUDIO_TOKEN_FILE : LOCAL_TOKEN_FILE, "utf8"))
     } catch {}
   }
   return null
 }
 
-async function writeTokens(tokens) {
+async function writeTokens(tokens, studio = false) {
+  if (studio) {
+    const temp = STUDIO_TOKEN_FILE + ".tmp"
+    fs.writeFileSync(temp, JSON.stringify(tokens, null, 2), { mode: 0o600 })
+    fs.renameSync(temp, STUDIO_TOKEN_FILE)
+    return
+  }
   if (hasSupabase()) {
     await kvSet(TOKENS_KEY, tokens)
   }
@@ -66,15 +73,15 @@ export async function disconnectOAuth() {
   }
 }
 
-export async function getOAuthStatus() {
-  const [cfg, tok] = await Promise.all([getOAuthClientConfig(), readTokens()])
+export async function getOAuthStatus(studio = false) {
+  const [cfg, tok] = await Promise.all([getOAuthClientConfig(), readTokens(studio)])
   return {
     configured: Boolean(cfg?.client_id && cfg?.client_secret),
     connected: Boolean(tok?.refresh_token || (tok?.access_token && Date.now() < (tok.expires_at || 0))),
   }
 }
 
-export async function getAuthUrl(origin) {
+export async function getAuthUrl(origin, { chooseAccount = false } = {}) {
   const cfg = await getOAuthClientConfig()
   if (!cfg) throw new Error("Credenciais OAuth do Google não configuradas.")
   const redirectUri = `${origin}/api/youtube/oauth/callback`
@@ -84,14 +91,14 @@ export async function getAuthUrl(origin) {
     response_type: "code",
     scope: SCOPES,
     access_type: "offline",
-    prompt: "consent",
+    prompt: chooseAccount ? "select_account consent" : "consent",
     include_granted_scopes: "true",
     state: crypto.randomBytes(12).toString("hex"),
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }
 
-export async function exchangeCode(code, origin) {
+export async function exchangeCode(code, origin, studio = false, { persist = true } = {}) {
   const cfg = await getOAuthClientConfig()
   if (!cfg) throw new Error("Credenciais OAuth do Google não configuradas.")
   const redirectUri = `${origin}/api/youtube/oauth/callback`
@@ -111,7 +118,7 @@ export async function exchangeCode(code, origin) {
   if (!res.ok || !data.access_token) {
     throw new Error(data.error_description || data.error || `Falha OAuth HTTP ${res.status}`)
   }
-  const prev = await readTokens()
+  const prev = studio ? null : await readTokens()
   const saved = {
     access_token: data.access_token,
     refresh_token: data.refresh_token || prev?.refresh_token || "",
@@ -119,12 +126,15 @@ export async function exchangeCode(code, origin) {
     scope: data.scope || SCOPES,
     updated_at: new Date().toISOString(),
   }
-  await writeTokens(saved)
+  if (persist) await writeTokens(saved, studio)
   return saved
 }
 
-export async function getValidAccessToken() {
-  const tok = await readTokens()
+export async function getValidAccessToken(studio = false) {
+  return refreshYouTubeToken(await readTokens(studio), (tokens) => writeTokens(tokens, studio))
+}
+
+export async function refreshYouTubeToken(tok, persist) {
   if (!tok?.access_token && !tok?.refresh_token) {
     throw new Error("Conecte sua conta do YouTube via OAuth 2.0 em Integrações primeiro.")
   }
@@ -153,8 +163,21 @@ export async function getValidAccessToken() {
     expires_at: Date.now() + Number(data.expires_in || 3500) * 1000 - 60_000,
     updated_at: new Date().toISOString(),
   }
-  await writeTokens(updated)
+  await persist(updated)
   return updated.access_token
+}
+
+export async function getStudioChannel(token) {
+  const accessToken = token ?? await getValidAccessToken(true)
+  const response = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(12_000),
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error?.message || "Não foi possível consultar o canal conectado.")
+  if (data.items?.length !== 1 || !data.items[0].id) throw new Error("Reconecte selecionando o canal que receberá os vídeos.")
+  const { id, snippet } = data.items[0]
+  return { id, title: snippet?.title || id, handle: snippet?.customUrl || "", logo: snippet?.thumbnails?.medium?.url || snippet?.thumbnails?.default?.url || "" }
 }
 
 function isoDateDaysAgo(days) {
@@ -224,8 +247,13 @@ export async function uploadShortToYouTube({
   tags = [],
   privacyStatus = "private",
   publishAt = "",
+  expectedChannel,
+  accessToken,
 }) {
-  const token = await getValidAccessToken()
+  const token = accessToken ?? await getValidAccessToken(Boolean(expectedChannel))
+  if (expectedChannel && (await getStudioChannel(token)).id !== expectedChannel) {
+    throw new Error("O canal conectado mudou. Revise o destino antes de enviar.")
+  }
   const cleanTitle = String(title || "Short #Shorts").trim().slice(0, 100)
   const status = {
     privacyStatus: ["public", "unlisted", "private"].includes(privacyStatus) ? privacyStatus : "private",

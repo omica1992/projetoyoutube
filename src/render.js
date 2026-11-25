@@ -38,7 +38,7 @@ function run(cmd, args, onLine) {
 }
 
 /** Captura a animação quadro a quadro (determinístico) e devolve os frames. */
-export async function captureFrames({ htmlPath, framesDir, duration, onProgress, workers: workerCount }) {
+export async function captureFrames({ htmlPath, framesDir, duration, onProgress, workers: workerCount, webgl = false }) {
   const chrome = findChrome()
   fs.rmSync(framesDir, { recursive: true, force: true })
   fs.mkdirSync(framesDir, { recursive: true })
@@ -75,6 +75,7 @@ export async function captureFrames({ htmlPath, framesDir, duration, onProgress,
         "--disable-lcd-text",
         "--mute-audio",
         "--autoplay-policy=no-user-gesture-required",
+        ...(webgl ? ["--enable-unsafe-swiftshader"] : []),
         `--window-size=${WIDTH},${HEIGHT}`,
       ],
     })
@@ -113,7 +114,9 @@ export async function captureFrames({ htmlPath, framesDir, duration, onProgress,
     }
   }
 
-  await Promise.all(Array.from({ length: workers }, (_, i) => worker(i)))
+  const results = await Promise.allSettled(Array.from({ length: workers }, (_, i) => worker(i)))
+  const failure = results.find((result) => result.status === "rejected")
+  if (failure) throw failure.reason
   return { frames, duration: total, errors, workers }
 }
 
@@ -139,12 +142,12 @@ export async function encodeMp4({ framesDir, audioPath, outFile, onLine }) {
 }
 
 /** Teste rápido: abre o HTML, desenha dois instantes e compara. */
-export async function smokeHtml({ htmlPath, duration }) {
+export async function smokeHtml({ htmlPath, duration, webgl = false }) {
   const chrome = findChrome()
   const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: "shell",
-    args: ["--hide-scrollbars", "--mute-audio", "--disable-lcd-text"],
+    args: ["--hide-scrollbars", "--mute-audio", "--disable-lcd-text", ...(webgl ? ["--enable-unsafe-swiftshader"] : [])],
   })
   try {
     const page = await browser.newPage()
@@ -156,6 +159,7 @@ export async function smokeHtml({ htmlPath, duration }) {
     page.on("pageerror", (e) => errors.push(String(e)))
     await page.goto(pathToFileURL(htmlPath).href, { waitUntil: "load", timeout: 45_000 })
     await page.waitForFunction(() => window.__STUDIO__ && window.__STUDIO__.setTime, { timeout: 20_000 })
+      .catch((e) => { throw new Error(errors[0] || e.message) })
     const d = Number(await page.evaluate(() => window.__STUDIO__.duration)) || duration
 
     const shot = async (t) => {

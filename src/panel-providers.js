@@ -141,14 +141,14 @@ export async function vidiqClient(key, request = fetch) {
   }
 }
 
-async function gemini(key, route, options, request) {
+async function gemini(key, route, options, request, timeoutMs = 55_000) {
   if (!key) throw new Error("Conecte a chave do Google AI Studio em Integrações.")
   const response = await request(`https://generativelanguage.googleapis.com/v1beta/${route}`, {
-    ...options, redirect: "error", signal: AbortSignal.timeout(55_000),
+    ...options, redirect: "error", signal: AbortSignal.timeout(timeoutMs),
     headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
   })
   if (!response.ok) {
-    if (response.status === 429) throw new Error("Limite de narração do Gemini atingido. Confira a cota do projeto no Google AI Studio.")
+    if (response.status === 429) throw new Error("Limite do Gemini atingido. Confira a cota do projeto no Google AI Studio.")
     if ([400, 401, 403].includes(response.status)) throw new Error("O Google recusou a consulta. Confira a chave, o acesso à Gemini API e o modelo no projeto.")
     throw new Error(`A Gemini API retornou HTTP ${response.status}.`)
   }
@@ -156,13 +156,54 @@ async function gemini(key, route, options, request) {
 }
 
 export const TTS_MODEL = "gemini-2.5-flash-preview-tts"
+export const ARLO = { id: "en-us-arlo", label: "Arlo · en-US" }
+let library, pendingLibrary
+export async function googleVoices(key) {
+  if (library?.key === key && library.until > Date.now()) return library.voices
+  if (pendingLibrary?.key === key) return pendingLibrary.promise
+  const promise = (async () => {
+    const known = new Set(VOICE_CATALOG.map(v => v.id.toLowerCase()))
+    const voices = [...VOICE_CATALOG]
+    let token = ""
+    const pages = new Set()
+    do {
+      if (pages.has(token)) throw Error("O Google repetiu uma página do catálogo. Tente novamente.")
+      pages.add(token)
+      const query = new URLSearchParams({ page_size: "100" })
+      if (token) query.set("page_token", token)
+      const page = await gemini(key, "voices?" + query, {}, fetch)
+      for (const row of page.voices || []) {
+        if (!row.id || known.has(row.id.toLowerCase())) continue
+        known.add(row.id.toLowerCase())
+        voices.push({ id: row.id, label: [row.display_name || row.id, row.language_code].filter(Boolean).join(" · ") })
+      }
+      token = page.next_page_token || ""
+    } while (token)
+    library = { key, voices, until: Date.now() + 3600000 }
+    return voices
+  })()
+  pendingLibrary = { key, promise }
+  try { return await promise } finally { if (pendingLibrary?.promise === promise) pendingLibrary = null }
+}
 export async function verifyGemini(key, request = fetch) {
   await gemini(key, `models/${TTS_MODEL}`, {}, request)
 }
 
 export async function generateNarration({ key, text, voice, style = "narration" }, request = fetch) {
-  if (!VOICES.includes(voice)) throw new Error("Selecione uma voz disponível.")
   const styleDesc = STYLES[style] || STYLES.narration
+  if (!VOICES.includes(voice)) {
+    if (voice !== ARLO.id && !(await googleVoices(key)).some(v => v.id === voice)) throw Error("Selecione uma voz disponível.")
+    const result = await gemini(key, "interactions", { method: "POST", body: JSON.stringify({
+      model: "gemini-3.8-flash-tts",
+      input: [{ type: "user_input", content: [{ type: "text", text, annotations: [{ type: "speech_metadata", style: "Português do Brasil. " + styleDesc }] }] }],
+      response_format: { type: "audio", mime_type: "audio/wav" },
+      generation_config: { speech_config: [{ voice }] },
+    }) }, request, 120000)
+    const audio = result.steps?.filter(s => s.type === "model_output").flatMap(s => s.content || []).find(c => c.type === "audio")
+    const wav = Buffer.from(audio?.data || "", "base64")
+    if (wav.length <= 44 || wav.toString("ascii",0,4) !== "RIFF" || wav.toString("ascii",8,12) !== "WAVE") throw Error("O Google não devolveu uma narração WAV válida.")
+    return wav
+  }
   const data = await gemini(key, `models/${TTS_MODEL}:generateContent`, {
     method: "POST",
     body: JSON.stringify({
@@ -172,7 +213,7 @@ export async function generateNarration({ key, text, voice, style = "narration" 
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
       },
     }),
-  }, request)
+  }, request, 120_000)
   const audio = data.candidates?.[0]?.content?.parts?.find((part) => part.inlineData?.data)?.inlineData
   if (!audio) throw new Error("O Gemini não retornou áudio para esse roteiro.")
   const pcm = Buffer.from(audio.data, "base64")

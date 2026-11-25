@@ -104,6 +104,10 @@ export async function ask({ model, text, timeoutMs = 300_000, onTick }) {
     onTick?.(body)
     return body
   }
+  return askOpenCode({ model, text, timeoutMs, onTick })
+}
+
+export async function askOpenCode({ model, text, timeoutMs = 300_000, onTick }) {
   const client = await getClient()
   const spec = parseModelSpec(model)
   const session = await client.session.create({
