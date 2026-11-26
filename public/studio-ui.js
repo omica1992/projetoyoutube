@@ -275,19 +275,39 @@ function modelOptions(label, name, saved, preferred) {
 }
 
 let fullVoiceLibrary
+let elevenVoiceLibrary
+function currentVoiceList(form) {
+  const provider = form?.elements.ttsProvider?.value || "google"
+  if (provider === "elevenlabs") return elevenVoiceLibrary || cache.config.elevenVoices || []
+  return fullVoiceLibrary || cache.config.voices || []
+}
 function showVoiceOptions(form, preferred) {
   const search = form.querySelector("#voice-search")
   const select = form.elements.voice
   const query = search.value.trim().toLocaleLowerCase("pt-BR")
-  const library = fullVoiceLibrary || cache.config.voices
+  const library = currentVoiceList(form)
   const matches = library.filter(v => (v.label + " " + v.id).toLocaleLowerCase("pt-BR").includes(query))
   select.replaceChildren(...matches.map(v => new Option(v.label, v.id)))
   if (matches.some(v => v.id === preferred)) select.value = preferred
+  else if (matches[0]) select.value = matches[0].id
   form.querySelector("#voice-count").textContent = matches.length ? matches.length.toLocaleString("pt-BR") + (matches.length === 1 ? " voz" : " vozes") : "Nenhuma voz encontrada."
 }
 async function loadVoiceLibrary(project) {
   const form = document.querySelector("#create-form")
-  if (!form || !cache.config.gemini) return
+  if (!form) return
+  const provider = form.elements.ttsProvider?.value || "google"
+  if (provider === "elevenlabs") {
+    const saved = readDraft(project)?.fields?.voice || (project?.ttsProvider === "elevenlabs" ? project.voice : "")
+    try {
+      elevenVoiceLibrary ||= await api("/vozes?provider=elevenlabs")
+      if (form.isConnected) showVoiceOptions(form, saved || elevenVoiceLibrary[0]?.id)
+    } catch {
+      if (form.isConnected) showVoiceOptions(form, saved)
+    }
+    updateCreateMeta(form)
+    return
+  }
+  if (!cache.config.gemini) return
   const initial = form.elements.voice.value
   const saved = readDraft(project)?.fields?.voice || project?.voice || initial
   try {
@@ -296,6 +316,7 @@ async function loadVoiceLibrary(project) {
   } catch {
     if (form.isConnected) form.querySelector("#voice-count").textContent = "Biblioteca ampliada indisponível. Mostrando as vozes locais."
   }
+  updateCreateMeta(form)
 }
 
 function scriptMeterText(text) {
@@ -309,10 +330,11 @@ function settingsSummaryText(form) {
   const s = form.elements.style?.value
   const styleLabel = s === "3d" || !s ? "3D" : s === "2d-palito" ? "2D Palito" : s.toUpperCase()
   const dur = form.elements.duration?.value
+  const tts = form.elements.ttsProvider?.value === "elevenlabs" ? "ElevenLabs" : "Google"
   const voiceOpt = form.elements.voice?.selectedOptions?.[0]?.textContent?.split("·")[0]?.trim()
   const modelId = form.elements.animationModel?.value || ""
   const modelName = modelId.split("/").at(-1) || ""
-  return [styleLabel, dur ? `${dur}s` : "", voiceOpt, modelName].filter(Boolean).join(" · ")
+  return [styleLabel, dur ? `${dur}s` : "", tts, voiceOpt, modelName].filter(Boolean).join(" · ")
 }
 
 function updateCreateMeta(form) {
@@ -326,8 +348,11 @@ function updateCreateMeta(form) {
 function create(project) {
   const config = cache.config
   const opts = [30, 45, 60, 90, 120, 150].map((seconds) => `<option value="${seconds}"${seconds === (project?.duracaoAlvo || 60) ? " selected" : ""}>${seconds} segundos</option>`).join("")
-  const available = fullVoiceLibrary || config.voices
-  const voices = (project?.voice && !available.some(v => v.id === project.voice) ? [...available,{id:project.voice,label:project.voice}] : available).map((voice) => `<option value="${html(voice.id)}"${(project?.voice || "en-us-arlo") === voice.id ? " selected" : ""}>${html(voice.label || voice.id)}</option>`).join("")
+  const ttsProvider = project?.ttsProvider || (config.elevenlabs && !config.gemini ? "elevenlabs" : "google")
+  const available = ttsProvider === "elevenlabs" ? (elevenVoiceLibrary || config.elevenVoices || []) : (fullVoiceLibrary || config.voices)
+  const defaultVoice = ttsProvider === "elevenlabs" ? (available[0]?.id || "pNInz6obpgDQGcFmaJgB") : "en-us-arlo"
+  const voices = (project?.voice && !available.some(v => v.id === project.voice) ? [...available,{id:project.voice,label:project.voice}] : available).map((voice) => `<option value="${html(voice.id)}"${(project?.voice || defaultVoice) === voice.id ? " selected" : ""}>${html(voice.label || voice.id)}</option>`).join("")
+  const canNarrate = Boolean(config.gemini || config.elevenlabs)
   const hasScript = Boolean(project?.roteiro?.roteiro?.trim())
   const hasAudio = Boolean(project?.audio)
   const hasVideo = Boolean(version(project) || project?.urls?.mp4)
@@ -363,16 +388,24 @@ function create(project) {
         <div class="fields">
           ${project?.id ? "" : `<label>Duração alvo<select name="duration">${opts}</select></label>${modelOptions("IA do roteiro", "scriptModel", null, "opencode-go/deepseek-v4.1-flash")}`}
           ${modelOptions("IA da animação", "animationModel", project?.animationModel, hosted ? "opencode-go/deepseek-v4.1-flash" : "opencode-go/kimi-k3")}
-          <div class="voice-settings"><label>Buscar voz do Google<input id="voice-search" type="search" placeholder="Nome ou idioma, ex.: Arlo, pt-BR"></label><label>Voz<select name="voice">${voices}</select></label><small id="voice-count" aria-live="polite">${config.gemini ? "Carregando biblioteca…" : "Vozes locais"}</small></div>
+          <div class="voice-settings">
+            <label>Provedor de voz<select name="ttsProvider">
+              <option value="google"${ttsProvider === "google" ? " selected" : ""}${config.gemini ? "" : " disabled"}>Google (Gemini TTS)</option>
+              <option value="elevenlabs"${ttsProvider === "elevenlabs" ? " selected" : ""}${config.elevenlabs ? "" : " disabled"}>ElevenLabs (tags de áudio v3)</option>
+            </select></label>
+            <label>Buscar voz<input id="voice-search" type="search" placeholder="Nome ou idioma, ex.: Adam, Arlo, pt-BR"></label>
+            <label>Voz<select name="voice">${voices}</select></label>
+            <small id="voice-count" aria-live="polite">${ttsProvider === "elevenlabs" ? "Vozes ElevenLabs (suporta tags [whispers], [excited], [pauses])" : config.gemini ? "Carregando biblioteca…" : "Vozes locais"}</small>
+          </div>
         </div>
       </details>
       ${project?.urls?.audio ? `<div class="script-audio"><strong>Narração do projeto</strong><audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>${hosted ? `<a class="text-link" href="${html(project.urls.audio)}" download="narracao.wav">Baixar narração WAV</a>` : ""}</div>` : ""}
-      ${!config.gemini ? '<p class="notice">Configure a chave Gemini no servidor para gerar a narração.</p>' : ""}
+      ${!canNarrate ? '<p class="notice">Configure a chave Gemini ou ElevenLabs no servidor para gerar a narração.</p>' : ""}
       <small class="draft-status" role="status"></small><div class="actions production-actions">
-        <button class="button" name="intent" value="audio" ${!config.gemini || project?.publicacao ? "disabled" : ""}>Gerar narração</button>
+        <button class="button" name="intent" value="audio" ${!canNarrate || project?.publicacao ? "disabled" : ""}>Gerar narração</button>
         ${!hosted && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}
         ${hosted && config.browserRender && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="render3d" ${!config.go ? "disabled" : ""}>Renderizar animação 3D</button>` : ""}
-        <button class="button secondary" name="intent" value="produce" ${!config.go || !config.gemini || (!config.kit && !config.browserRender) || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
+        <button class="button secondary" name="intent" value="produce" ${!config.go || !canNarrate || (!config.kit && !config.browserRender) || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
         <button class="button secondary" name="intent" value="save">Salvar roteiro</button>
         ${embedded && hosted ? '<a class="text-link" href="/#pacote" target="_top">Pacote de edição</a>' : ""}
       </div>
@@ -835,7 +868,7 @@ content.addEventListener("submit", (event) => {
       localStorage.setItem("animationModel", data.animationModel)
       if (intent === "script") {
         if (!data.idea?.trim()) throw new Error("Digite o tema do vídeo.")
-        const next = await jobResult(await api("/projetos", { idea: data.idea, duration: Number(data.duration), style: data.style, channelId: cache.activeId, model: data.scriptModel, pautaId: data.pautaId }))
+        const next = await jobResult(await api("/projetos", { idea: data.idea, duration: Number(data.duration), style: data.style, ttsProvider: data.ttsProvider, channelId: cache.activeId, model: data.scriptModel, pautaId: data.pautaId }))
         localStorage.removeItem(draftKey(project))
         go("criar", next.id)
         return
@@ -843,7 +876,7 @@ content.addEventListener("submit", (event) => {
       const titulo = data.title?.trim() || data.idea?.trim() || "Novo vídeo"
       const roteiro = data.script?.trim() || ""
       if (["produce", "animate", "audio"].includes(intent) && !roteiro) throw new Error("Escreva, cole ou gere o roteiro primeiro.")
-      const next = project || (await api("/projetos", { idea: titulo, duration: Number(data.duration) || 60, style: data.style, manual: true, channelId: cache.activeId, pautaId:data.pautaId })).project
+      const next = project || (await api("/projetos", { idea: titulo, duration: Number(data.duration) || 60, style: data.style, ttsProvider: data.ttsProvider, manual: true, channelId: cache.activeId, pautaId:data.pautaId })).project
       if (intent === "render3d") {
         if (!next.audio) throw new Error("Gere a narração primeiro.")
         if (roteiro !== next.roteiro?.roteiro || titulo !== next.titulo) throw new Error("Gere uma nova narração para aplicar mudanças no roteiro ou no título.")
@@ -862,7 +895,7 @@ content.addEventListener("submit", (event) => {
       if (!next.audio) await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId, channelId:next.channelId })
       go("gerando", next.id)
       try {
-        const narrated = intent === "animate" ? next : await jobResult(await projectApi(next, "narracao", { titulo, roteiro, voice: data.voice, descricao: next.roteiro?.descricao }))
+        const narrated = intent === "animate" ? next : await jobResult(await projectApi(next, "narracao", { titulo, roteiro, voice: data.voice, ttsProvider: data.ttsProvider, descricao: next.roteiro?.descricao }))
         localStorage.removeItem("studio-draft:" + JSON.stringify([next.channelId || cache.activeId,project?.id || "novo"]))
         if (intent === "audio") { go("criar", narrated.id); return }
         cache.current = narrated
@@ -998,6 +1031,7 @@ content.addEventListener("change", (event) => {
   if (field.name === "projectId" && field.form?.id === "publication-picker") updatePublicationPreview(field.value)
   if (field.id === "archived-projects") { cache.showArchived = field.checked; navigate() }
   if (field.matches(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
+  if (field.name === "ttsProvider" && field.form?.id === "create-form") loadVoiceLibrary(cache.current)
   if (field.closest("#create-form")) updateCreateMeta(field.form)
   const project = cache.current
   if (field.name === "visibility") {

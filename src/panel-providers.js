@@ -1,8 +1,25 @@
 import { readFile, writeFile, rename, unlink } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
+import { spawn } from "node:child_process"
+import os from "node:os"
+import path from "node:path"
+import ffmpegPath from "ffmpeg-static"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 
-const keys = { vidiq: "VIDIQ_API_KEY", gemini: "GEMINI_API_KEY", youtube: "YOUTUBE_API_KEY", opencode: "OPENCODE_API_KEY" }
+const keys = { vidiq: "VIDIQ_API_KEY", gemini: "GEMINI_API_KEY", youtube: "YOUTUBE_API_KEY", opencode: "OPENCODE_API_KEY", elevenlabs: "ELEVENLABS_API_KEY" }
+
+export const ELEVEN_VOICES = [
+  { id: "pNInz6obpgDQGcFmaJgB", label: "Adam · Grave e narrativa (ElevenLabs)" },
+  { id: "EXAVITQu4vr4xnSDxMaL", label: "Sarah · Clara e natural (ElevenLabs)" },
+  { id: "ErXwobaYiN019PkySvjV", label: "Antoni · Equilibrada (ElevenLabs)" },
+  { id: "21m00Tcm4TlvDq8ikWAM", label: "Rachel · Calma e envolvente (ElevenLabs)" },
+  { id: "AZnzlk1XvdvUeBnXmlld", label: "Domi · Forte e expressiva (ElevenLabs)" },
+  { id: "TxGEqnHWrfWFTfGW9XjX", label: "Josh · Jovem e dinâmica (ElevenLabs)" },
+  { id: "VR6AewLTigWG4xSOukaG", label: "Arnold · Profunda (ElevenLabs)" },
+  { id: "yoZ06aMxZJJ28mfd3POQ", label: "Sam · Direta e firme (ElevenLabs)" },
+  { id: "onwK4e9ZLuTAKqWW03F9", label: "Daniel · Documental (ElevenLabs)" },
+  { id: "XB0fDUnXU5powFXDhCwa", label: "Charlotte · Suave (ElevenLabs)" },
+]
 export const VOICE_CATALOG = [
   { id: "Kore", label: "Kore · Firme e clara" },
   { id: "Puck", label: "Puck · Animada e jovem" },
@@ -236,4 +253,87 @@ export async function generateNarration({ key, text, voice, style = "narration" 
   header.write("data", 36)
   header.writeUInt32LE(pcm.length, 40)
   return Buffer.concat([header, pcm])
+}
+
+export async function elevenVoices(key) {
+  if (!key) return ELEVEN_VOICES
+  try {
+    const res = await fetch("https://api.elevenlabs.io/v1/voices", {
+      headers: { "xi-api-key": key },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!res.ok) return ELEVEN_VOICES
+    const data = await res.json()
+    const list = (data.voices || []).map((v) => ({
+      id: v.voice_id,
+      label: `${v.name} · ${v.labels?.accent || v.category || "ElevenLabs"}`,
+    }))
+    return list.length ? list : ELEVEN_VOICES
+  } catch {
+    return ELEVEN_VOICES
+  }
+}
+
+function mp3BufferToWav(mp3Buf) {
+  return new Promise(async (resolve, reject) => {
+    const id = randomUUID().slice(0, 8)
+    const inFile = path.join(os.tmpdir(), `el-${id}.mp3`)
+    const outFile = path.join(os.tmpdir(), `el-${id}.wav`)
+    try {
+      await writeFile(inFile, mp3Buf)
+      const child = spawn(ffmpegPath || "ffmpeg", ["-y", "-i", inFile, "-acodec", "pcm_s16le", "-ar", "24000", "-ac", "1", outFile], { windowsHide: true })
+      let err = ""
+      child.stderr.on("data", (d) => (err += d.toString()))
+      child.on("error", reject)
+      child.on("close", async (code) => {
+        try {
+          if (code !== 0) return reject(new Error(`FFmpeg falhou ao converter áudio ElevenLabs: ${err.slice(-300)}`))
+          resolve(await readFile(outFile))
+        } finally {
+          await unlink(inFile).catch(() => {})
+          await unlink(outFile).catch(() => {})
+        }
+      })
+    } catch (e) {
+      await unlink(inFile).catch(() => {})
+      reject(e)
+    }
+  })
+}
+
+export async function generateElevenNarration({ key, text, voice }) {
+  if (!key) throw new Error("Configure a chave da ElevenLabs para gerar narração.")
+  const voiceId = String(voice || ELEVEN_VOICES[0].id).trim()
+  const tryModel = async (model_id, inputText) => {
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
+      method: "POST",
+      headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({
+        text: inputText,
+        model_id,
+        voice_settings: { stability: 0.45, similarity_boost: 0.78, style: 0.35, use_speaker_boost: true },
+      }),
+      signal: AbortSignal.timeout(120_000),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      const msg = err?.detail?.message || `ElevenLabs HTTP ${res.status}`
+      throw Object.assign(new Error(msg), { status: res.status })
+    }
+    return Buffer.from(await res.arrayBuffer())
+  }
+
+  let mp3
+  try {
+    // eleven_v3 suporta nativamente tags de áudio como [whispers], [excited], [sighs], [laughs], [pauses]
+    mp3 = await tryModel("eleven_v3", text)
+  } catch (err) {
+    if (err.status === 400 || err.status === 404 || err.status === 422) {
+      const clean = String(text).replace(/\[[^\]]{1,32}\]\s*/g, "")
+      mp3 = await tryModel("eleven_multilingual_v2", clean)
+    } else {
+      throw err
+    }
+  }
+  return mp3BufferToWav(mp3)
 }

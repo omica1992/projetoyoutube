@@ -3,7 +3,7 @@ import path from "node:path"
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto"
 import express from "express"
 import { notebook, updateNotebook, suggestIdeas, youtubeVideoId } from "./studio-planning.js"
-import { ARLO, generateNarration, googleVoices, providerKey, VOICE_CATALOG } from "./panel-providers.js"
+import { ARLO, ELEVEN_VOICES, elevenVoices, generateElevenNarration, generateNarration, googleVoices, providerKey, VOICE_CATALOG } from "./panel-providers.js"
 import { audioDuration } from "./timeline.js"
 import { parseJsonLoose } from "./opencode.js"
 import { askStudioGo, goKey, goModels, validGoModel } from "./studio-go.js"
@@ -94,7 +94,7 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     if (req.body.revision !== chatContext(project.id).revision) throw badRequest("O projeto mudou. Peça uma nova proposta ao chat.", 409)
     const patch = req.body.patch
     if (!patch || typeof patch !== "object" || Array.isArray(patch) || !Object.keys(patch).length ||
-        Object.keys(patch).some(key => !["titulo", "descricao", "roteiro", "html"].includes(key))) throw badRequest("Proposta inválida.")
+      Object.keys(patch).some(key => !["titulo", "descricao", "roteiro", "html"].includes(key))) throw badRequest("Proposta inválida.")
     const next = { ...project, roteiro: { ...project.roteiro } }
     if (Object.hasOwn(patch, "titulo")) {
       next.titulo = text(patch.titulo, 100)
@@ -169,14 +169,14 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
       const is2d = isStickStyle(style) || isStickStyle(storyboard?.estilo)
       const validated = is2d
         ? await renderStick2dVideo({
-            storyboard, words, audio: path.join(dir, project.audio), output: out, preview: true,
-            onProgress: (msg, pct) => progress(48 + 46 * (pct || 0), msg),
-          })
+          storyboard, words, audio: path.join(dir, project.audio), output: out, preview: true,
+          onProgress: (msg, pct) => progress(48 + 46 * (pct || 0), msg),
+        })
         : await renderKitVideo({
-            storyboard, words, audio: path.join(dir, project.audio), output: out, preview: true,
-            onProgress: renderProgress(progress, 48, 94),
-            repair: (value, errors) => repairKitVideo(modelId, value, errors, scene),
-          })
+          storyboard, words, audio: path.join(dir, project.audio), output: out, preview: true,
+          onProgress: renderProgress(progress, 48, 94),
+          repair: (value, errors) => repairKitVideo(modelId, value, errors, scene),
+        })
       fs.writeFileSync(path.join(dir, board), JSON.stringify(validated, null, 2))
       return {
         id, board, preview, model: modelId, style: is2d ? (storyboard?.estilo || style) : "3d", createdAt: new Date().toISOString(),
@@ -242,10 +242,13 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
   }
 
   router.get("/config", route(async (_req, res) => {
-    const [gemini, go, models, kit] = await Promise.all([providerKey("gemini"), goKey(), goModels(), kitAvailability()])
-    res.json({ voices: [ARLO, ...VOICE_CATALOG], gemini: Boolean(gemini), go: Boolean(go), models: Object.keys(models).sort(), modelCatalog: models, kit })
+    const [gemini, elevenlabs, go, models, kit] = await Promise.all([providerKey("gemini"), providerKey("elevenlabs"), goKey(), goModels(), kitAvailability()])
+    res.json({ voices: [ARLO, ...VOICE_CATALOG], elevenVoices: ELEVEN_VOICES, gemini: Boolean(gemini), elevenlabs: Boolean(elevenlabs), go: Boolean(go), models: Object.keys(models).sort(), modelCatalog: models, kit })
   }))
-  router.get("/vozes", route(async (_req, res) => res.json(await googleVoices(await providerKey("gemini")))))
+  router.get("/vozes", route(async (req, res) => {
+    if (req.query.provider === "elevenlabs") return res.json(await elevenVoices(await providerKey("elevenlabs")))
+    res.json(await googleVoices(await providerKey("gemini")))
+  }))
 
   router.get("/canais", route(async (_req, res) => res.json(await listStudioChannels())))
   router.get("/canais/pendente/:id", route((req, res) => {
@@ -300,6 +303,7 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     const duration = Number(req.body?.duration)
     const manual = req.body?.manual === true
     const style = isStickStyle(req.body?.style) ? req.body.style : "3d"
+    const ttsProvider = req.body?.ttsProvider === "elevenlabs" ? "elevenlabs" : "google"
     const channelId = text(req.body?.channelId, 80) || null
     if (channelId && !(await listStudioChannels()).channels.some((channel) => channel.id === channelId)) {
       throw badRequest("Escolha um canal conectado.")
@@ -311,7 +315,7 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
       const titulo = roteiro.titulos[0] || text(idea, 100) || "Novo Short"
       return commit({
         id: `fdn-${slugify(titulo) || "short"}-${randomUUID().slice(0, 8)}`,
-        studio: "fora-do-nivel", titulo, ideia: idea, duracaoAlvo: duration, style, roteiro, channelId,
+        studio: "fora-do-nivel", titulo, ideia: idea, duracaoAlvo: duration, style, ttsProvider, roteiro, channelId,
         criadoEm: new Date().toISOString(), pautaId: text(req.body.pautaId, 80) || null,
       })
     }
@@ -320,9 +324,12 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     const scriptModel = model(req.body?.model)
     run(res, "roteiro", null, async ({ progress }) => {
       progress(20, "Escrevendo títulos e narração")
+      const tagRule = ttsProvider === "elevenlabs"
+        ? `Inclua tags de áudio expressivas da ElevenLabs v3 inline nos momentos certos da narração (ex.: [curious], [excited], [whispers], [sighs], [gasp], [pauses]) sem exagerar, mantendo o texto natural em português brasileiro.`
+        : `O campo "roteiro" deve conter APENAS o texto exato que será falado na narração (sem rubricas, sem "Visual:", sem "Narrador:" e sem indicações entre parênteses ou colchetes).`
       const generated = parseJsonLoose(await askStudioGo({
         model: scriptModel,
-        text: `Escreva um roteiro em português brasileiro de aproximadamente ${duration} segundos para um vídeo 3D explicativo. Use frases curtas, gancho forte nos 3 primeiros segundos e explicação clara, sem inventar dados. O campo "roteiro" deve conter APENAS o texto exato que será falado na narração (sem rubricas, sem "Visual:", sem "Narrador:" e sem indicações entre parênteses ou colchetes). Retorne somente {"titulo":"","roteiro":"","descricao":""}. Tema: ${JSON.stringify(idea)}`,
+        text: `Escreva um roteiro em português brasileiro de aproximadamente ${duration} segundos para um vídeo explicativo (${style}). Use frases curtas, gancho forte nos 3 primeiros segundos e explicação clara, sem inventar dados. ${tagRule} Retorne somente {"titulo":"","roteiro":"","descricao":""}. Tema: ${JSON.stringify(idea)}`,
       }))
       const roteiro = text(generated?.roteiro, 5000)
       if (!roteiro) throw new Error("O modelo não retornou um roteiro.")
@@ -357,13 +364,16 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     const titulo = text(req.body?.titulo, 100)
     const descricao = text(req.body?.descricao, 5000)
     const voice = req.body?.voice
+    const ttsProvider = req.body?.ttsProvider === "elevenlabs" ? "elevenlabs" : "google"
     if (project.publicacao) throw badRequest("Este projeto já foi enviado ao YouTube.", 409)
     if (!roteiro || !titulo) throw badRequest("Preencha o título e a narração.")
     if (typeof voice !== "string" || !voice.trim() || voice.length > 300) throw badRequest("Escolha uma voz.")
 
     run(res, "narracao", project, async ({ progress }, id) => {
-      progress(20, "Gerando a voz no Gemini")
-      const wav = await generateNarration({ key: await providerKey("gemini"), text: roteiro, voice })
+      progress(20, ttsProvider === "elevenlabs" ? "Gerando a voz na ElevenLabs (com tags de áudio)" : "Gerando a voz no Gemini")
+      const wav = ttsProvider === "elevenlabs"
+        ? await generateElevenNarration({ key: await providerKey("elevenlabs"), text: roteiro, voice })
+        : await generateNarration({ key: await providerKey("gemini"), text: roteiro, voice })
       const file = `audio-${id}.wav`
       const out = path.join(projectDir(project.id), file)
       fs.writeFileSync(out, wav)
@@ -373,7 +383,7 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
           throw new Error(duration > 180 ? "A narração passou de 3 minutos. Encurte o texto e gere de novo." : "O áudio recebido está vazio ou ilegível.")
         }
         return commit({
-          ...project, titulo, roteiro: { ...project.roteiro, roteiro, descricao }, voice,
+          ...project, titulo, roteiro: { ...project.roteiro, roteiro, descricao }, voice, ttsProvider,
           audio: file, duration, html: null, htmlFonte: null, mp4: null,
           versions: [], history: [], selectedVersion: null, words: null, exportedVersion: null, scenePlan: null,
         })
