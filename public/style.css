@@ -783,7 +783,9 @@ body[data-workspace=producao] .model-picker { display:none; }
 .chat-context-bar select { width:auto; max-width:min(100%,18rem); }
 .studio-next-action { display:none; }
 @media(max-width:700px) {
-  .studio-next-action { position:fixed; z-index:55; display:flex; justify-content:center; inset:auto 0 0; padding:9px 14px max(9px,env(safe-area-inset-bottom)); background:#fffffff5; border-top:1px solid var(--line); box-shadow:0 -5px 18px #17233c14; }
+  .studio-next-action { position:fixed; z-index:55; display:flex; justify-content:center; inset:auto 0 var(--rail-height,56px); padding:9px 14px; background:#fffffff5; border-top:1px solid var(--line); box-shadow:0 -5px 18px #17233c14; }
+  .app:has(.rail.mobile-open) .studio-next-action { display:none; }
+  .app:has(.studio-next-action:not([hidden])) .stage { padding-bottom:155px; }
   .studio-next-action button { width:min(100%,24rem); min-height:43px; }
 }
 .studio-next-action { flex-direction:column; align-items:center; }

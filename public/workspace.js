@@ -8,6 +8,12 @@ let editorRoute
 let mobileAction
 const nextAction = document.querySelector("#studio-next-action")
 const nextActionButton = nextAction?.querySelector("button")
+const navigationRail = document.querySelector("#rail")
+if (nextAction && navigationRail) new ResizeObserver(() => {
+  if (!navigationRail.classList.contains("mobile-open")) {
+    nextAction.style.setProperty("--rail-height", `${navigationRail.offsetHeight}px`)
+  }
+}).observe(navigationRail)
 function updateNextAction() {
   if (!nextAction) return
   const creating = /^(?:producao|criar(?:\/.*)?)$/.test(location.hash.slice(1) || "criar")
