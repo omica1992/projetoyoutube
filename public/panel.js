@@ -1252,11 +1252,9 @@ async function loadAcervo({ chat = false } = {}) {
     const vis = (arr) => arr.filter((x) => showArch || !x.archived)
     const vBuscas = vis(buscas)
     const vAnalises = vis(analises)
-    const vRoteiros = vis(roteiros)
 
     $("#count-searches").textContent = vBuscas.length
     $("#count-analyses").textContent = vAnalises.length
-    $("#count-scripts").textContent = vRoteiros.length
 
     if (chat) {
       if (!activeChatId && allChats.length) activeChatId = allChats.find((c) => !c.archived)?.id || allChats[0].id
@@ -1312,7 +1310,6 @@ async function loadAcervo({ chat = false } = {}) {
       head.append(el("strong", r.roteiro?.titulo || r.pauta), el("span", r.status === "rascunho" ? "Rascunho" : "Validado", `draft-badge ${r.status === "rascunho" ? "rascunho" : "validado"}`))
       return makeCard(head, [toText(r.roteiro?.promessa).slice(0, 100), new Date(r.updatedAt || r.createdAt).toLocaleString("pt-BR")].filter(Boolean).join(" · "), btn("Abrir", () => loadSavedScript(r), "primary", "pen"), ...archDel("roteiros", r))
     }
-    listItems("#history-scripts", vRoteiros.map(scriptCard), "Nenhum roteiro ainda.", "script")
     listItems("#script-drafts-list", roteiros.filter((r) => !r.archived).slice(0, 12).map(scriptCard), "Seus rascunhos e roteiros aparecem aqui.", "script")
   } catch {}
 }

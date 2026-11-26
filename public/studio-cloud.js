@@ -16,7 +16,7 @@ function project(row) {
   const recorded = audio.get(row.id)
   return {
     id: row.id, titulo:row.roteiro?.titulo || row.pauta || "Roteiro", roteiro:row.roteiro,
-    duracaoAlvo:row.duracao, criadoEm:row.createdAt, channelId:row.channelId || channel?.id || null, pautaId:row.pautaId,
+    duracaoAlvo:row.duracao, criadoEm:row.createdAt, channelId:row.channelId || channel?.id || null, pautaId:row.pautaId, archived:Boolean(row.archived),
     urls:{audio:recorded?.url || null},voice:recorded?.voice, audio:recorded?.url || null,
     publicacao:row.publishedId ? {id:row.publishedId} : null,
   }
@@ -38,8 +38,9 @@ export async function cloudApi(path, body) {
     return profile
   }
   if (path.startsWith("/projetos?")) {
-    const id = new URLSearchParams(path.split("?")[1]).get("canal")
-    return (await request("/acervo")).roteiros.filter(row => !row.archived && (row.channelId || channel?.id || "") === id).map(project)
+    const query = new URLSearchParams(path.split("?")[1])
+    const id = query.get("canal")
+    return (await request("/acervo")).roteiros.filter(row => (query.has("arquivados") || !row.archived) && (row.channelId || channel?.id || "") === id).map(project)
   }
   if (path === "/projetos" && body) {
     const result = body.manual
@@ -47,9 +48,10 @@ export async function cloudApi(path, body) {
       : await request("/roteiro",{pauta:body.idea.slice(0,240), contexto:body.idea.slice(240),duracao:body.duration,model:body.model,pautaId:body.pautaId,channelId:body.channelId})
     return {project:project(result.saved)}
   }
-  const match = /^\/projetos\/([\w-]+)(?:\/(roteiro|excluir|narracao))?$/.exec(path)
+  const match = /^\/projetos\/([\w-]+)(?:\/(roteiro|excluir|narracao|arquivar))?$/.exec(path)
   if (match) {
     const [,id,action] = match
+    if (action === "arquivar") return request("/acervo/roteiros/"+id,{ archived:body.archived },"PATCH")
     if (action === "excluir") {
       await request("/acervo/roteiros/"+id,undefined,"DELETE")
       if (audio.has(id)) URL.revokeObjectURL(audio.get(id).url)

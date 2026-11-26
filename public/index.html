@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#04110f">
+<meta name="theme-color" content="#f6f8fc">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23061b19' stroke='%23f2b53f' stroke-width='4'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial,sans-serif' font-weight='900' font-size='26' fill='%23f2b53f'%3EFN%3C/text%3E%3C/svg%3E">
 <title>FatoNexo Studio · Central de Criação</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=claro-1">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -66,7 +66,6 @@
       <a href="#projetos"><svg class="ic"><use href="#i-film"/></svg><span>Projetos</span></a>
       <a href="#pautas"><svg class="ic"><use href="#i-compass"/></svg><span>Pautas</span></a>
       <a href="#canais"><svg class="ic"><use href="#i-users"/></svg><span>Canais</span></a>
-      <a href="#pacote"><svg class="ic"><use href="#i-file"/></svg><span>Pacote de edição</span></a>
       <a href="#publicacao"><svg class="ic"><use href="#i-play"/></svg><span>Publicação</span></a>
       <a href="#estrategia"><svg class="ic"><use href="#i-compass"/></svg><span>Estratégia</span></a>
       <a href="#metas"><svg class="ic"><use href="#i-target"/></svg><span>Metas</span></a>
@@ -430,6 +429,20 @@
     </div>
   </div>
 
+  <details id="manual-topics" class="fold" hidden>
+    <summary>Pautas manuais</summary>
+    <article class="card">
+      <div class="card-head">
+        <div>
+          <h2>Pautas manuais</h2>
+          <p class="meta"><strong>O que é uma pauta?</strong> Planejamento de cada próximo Short (tema + Promessa, Contexto e Entrega). Use as setas para avançar ou clique em <strong>Roteiro</strong> para escrever.</p>
+        </div>
+        <button class="primary" id="btn-nova-pauta" type="button"><svg class="ic"><use href="#i-plus"/></svg>Nova pauta</button>
+      </div>
+      <div id="idea-list" class="kanban"></div>
+    </article>
+  </details>
+
   <div class="subpanel" data-subgroup="producao" data-subpanel="prod-pacote" hidden>
     <div class="two-col">
       <article class="card" id="titulo-test-card">
@@ -502,7 +515,7 @@
 <!-- ============================ ESTRATÉGIA ============================ -->
 <section id="estrategia" class="workspace-view" data-workspace aria-label="Estratégia" hidden>
   <div class="subtabs" data-subtabs="estrategia" role="tablist" aria-label="Áreas de estratégia">
-    <button type="button" class="active" data-subtarget="est-pautas">Funil &amp; Pautas</button>
+    <button type="button" class="active" data-subtarget="est-pautas">Desempenho</button>
     <button type="button" data-subtarget="est-horarios">Melhores Horários</button>
     <button type="button" data-subtarget="est-agenda">Agenda de Ações</button>
   </div>
@@ -518,16 +531,7 @@
       </div>
       <div id="funil-body" class="strategy-list"><p class="meta">Carregando funil…</p></div>
     </article>
-    <article class="card">
-      <div class="card-head">
-        <div>
-          <h2>Fila de pautas</h2>
-          <p class="meta"><strong>O que é uma pauta?</strong> Planejamento de cada próximo Short (tema + Promessa, Contexto e Entrega). Use as setas para avançar ou clique em <strong>Roteiro</strong> para escrever.</p>
-        </div>
-        <button class="primary" id="btn-nova-pauta" type="button"><svg class="ic"><use href="#i-plus"/></svg>Nova pauta</button>
-      </div>
-      <div id="idea-list" class="kanban"></div>
-    </article>
+
   </div>
 
   <div class="subpanel" data-subgroup="estrategia" data-subpanel="est-horarios" hidden>
@@ -643,13 +647,12 @@
 <!-- ============================ HISTÓRICO ============================ -->
 <section id="historico" class="workspace-view" data-workspace aria-label="Histórico" hidden>
   <div class="page-intro page-intro-row">
-    <div><h2>Seu acervo</h2><p class="meta">Tudo que você pesquisa, analisa e escreve fica salvo aqui — você pode arquivar ou excluir buscas antigas.</p></div>
+    <div><h2>Seu acervo</h2><p class="meta">Consulte buscas e análises salvas. Seus roteiros ficam em Projetos.</p></div>
     <label class="check"><input type="checkbox" id="history-show-archived"><span>Mostrar arquivados</span></label>
   </div>
   <div class="history-grid">
     <article class="card"><div class="card-head"><h3>Buscas</h3><span class="count" id="count-searches">0</span></div><div id="history-searches" class="strategy-list"></div></article>
     <article class="card"><div class="card-head"><h3>Análises</h3><span class="count" id="count-analyses">0</span></div><div id="history-analyses" class="strategy-list"></div></article>
-    <article class="card"><div class="card-head"><h3>Roteiros</h3><span class="count" id="count-scripts">0</span></div><div id="history-scripts" class="strategy-list"></div></article>
   </div>
 </section>
 

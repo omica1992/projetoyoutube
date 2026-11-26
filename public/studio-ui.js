@@ -105,7 +105,7 @@ function projectMedia(project, className = "") {
 
 function projectCards(projects) {
   if (!projects.length) return `<div class="surface empty studio-empty"><span class="empty-mark" aria-hidden="true">▤</span><h2>Nenhum projeto ainda</h2><p>Crie um vídeo para começar.</p>${link("criar", "Novo vídeo", "", "button")}</div>`
-  return `<div class="projects">${projects.map((project) => `<article class="project-card surface"><a href="${projectLink(project)}" aria-label="Abrir ${html(project.titulo)}">${projectMedia(project)}</a><div class="project-card-body"><h2>${html(project.titulo)}</h2><p>${projectState(project)}</p><div class="card-tools"><a href="${projectLink(project)}">Abrir projeto →</a><button type="button" class="delete-project" data-action="delete-project" data-id="${html(project.id)}" ${project.jobId ? "disabled" : ""}>Excluir</button></div></div></article>`).join("")}</div>`
+  return `<div class="projects">${projects.map((project) => `<article class="project-card surface"><a href="${projectLink(project)}" aria-label="Abrir ${html(project.titulo)}">${projectMedia(project)}</a><div class="project-card-body"><h2>${html(project.titulo)}</h2><p>${project.archived ? "Arquivado" : projectState(project)}</p><div class="card-tools"><a href="${projectLink(project)}">Abrir projeto →</a>${hosted ? `<button type="button" class="link-button" data-action="archive-project" data-id="${html(project.id)}">${project.archived ? "Restaurar" : "Arquivar"}</button>` : ""}<button type="button" class="delete-project" data-action="delete-project" data-id="${html(project.id)}" ${project.jobId ? "disabled" : ""}>Excluir</button></div></div></article>`).join("")}</div>`
 }
 
 function productionStep(p) {
@@ -272,7 +272,7 @@ function create(project) {
       <div class="fields">${modelOptions("IA da animação", "animationModel", project?.animationModel, "opencode-go/kimi-k3")}<div><label>Buscar voz do Google<input id="voice-search" type="search" placeholder="Nome ou idioma, ex.: Arlo, pt-BR"></label><label>Voz<select name="voice">${voices}</select></label><small id="voice-count" aria-live="polite">${config.gemini ? "Carregando biblioteca…" : "Vozes locais"}</small></div></div>
       ${project?.urls?.audio ? `<audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>${hosted ? `<a class="text-link" href="${html(project.urls.audio)}" download="narracao.wav">Baixar narração WAV</a>` : ""}` : ""}
       ${!config.gemini ? '<p class="notice">Configure a chave Gemini no servidor para gerar a narração.</p>' : ""}
-      <small class="draft-status" role="status"></small><div class="actions"><button class="button secondary" name="intent" value="save">Salvar roteiro</button><button class="button secondary" name="intent" value="audio" ${!config.gemini || project?.publicacao ? "disabled" : ""}>Gerar só a narração</button><button class="button" name="intent" value="produce" ${!config.go || !config.gemini || !config.kit || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
+      <small class="draft-status" role="status"></small><div class="actions">${embedded && hosted ? '<a class="button secondary" href="/#pacote" target="_top">Pacote de edição</a>' : ""}<button class="button secondary" name="intent" value="save">Salvar roteiro</button><button class="button secondary" name="intent" value="audio" ${!config.gemini || project?.publicacao ? "disabled" : ""}>Gerar só a narração</button><button class="button" name="intent" value="produce" ${!config.go || !config.gemini || !config.kit || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
       ${!hosted && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}</div>
     </form><aside class="surface production-preview"><div class="workspace-panel-title"><h2>Prévia</h2><span class="workspace-badge">${project?.urls?.mp4 || version(project) ? "Do projeto" : "Referência visual"}</span></div>
       <div class="poster-stage">${version(project) || project?.urls?.mp4 ? `<video class="portrait" controls playsinline preload="metadata" src="${html(version(project) ? videoUrl(project, version(project)) : project.urls.mp4)}"></video>` : `<img class="portrait" src="/studio-concept.webp" alt="Ilustração de referência de um rolo compactador na estrada">`}</div>
@@ -395,7 +395,7 @@ function redraw(page, project, pending) {
     inicio: home, pautas: topicPage, canais: channels, conectar: () => connect(pending, route()[1]), criar: () => create(project),
     gerando: () => generating(project), revisao: () => review(project), comparar: () => comparison(project),
     exportar: () => exportVideo(project), publicar: () => publish(project),
-    projetos: () => `<div class="library-toolbar"><h1>Projetos</h1>
+    projetos: () => `<div class="library-toolbar"><h1>Projetos</h1>${hosted ? `<label class="archive-filter"><input id="archived-projects" type="checkbox" ${cache.showArchived ? "checked" : ""}>Mostrar arquivados</label>` : ""}
       <label class="project-search"><span class="sr-only">Buscar projetos</span><input id="project-search" type="search" placeholder="Buscar projetos"></label>${link("criar", "Novo vídeo", "", "button")}</div>
       <div id="project-results" aria-live="polite">${projectCards(cache.projects)}</div>`,
   }
@@ -441,7 +441,7 @@ async function navigate() {
     const pending = id && page === "conectar" ? await api(`/canais/pendente/${encodeURIComponent(id)}`) : null
     const channel = channelProject(project)
     if (project) cache.activeId = channel?.id || ""
-    if (["inicio", "projetos"].includes(page)) cache.projects = await api(`/projetos?canal=${encodeURIComponent(cache.activeId)}`)
+    if (["inicio", "projetos"].includes(page)) cache.projects = await api(`/projetos?canal=${encodeURIComponent(cache.activeId)}${page === "projetos" && cache.showArchived ? "&arquivados=1" : ""}`)
     if (["pautas","inicio"].includes(page)) cache.book = await api("/pautas?canal="+encodeURIComponent(cache.activeId))
     if (request !== navigation) return
     cache.current = project
@@ -733,6 +733,12 @@ document.addEventListener("click", (event) => {
   if (!button) return
   const { action: kind, id } = button.dataset
   const project = cache.current
+  if (kind === "archive-project") action(async () => {
+    const target = cache.projects.find(item => item.id === id)
+    if (!target) return
+    await projectApi(target, "arquivar", { archived: !target.archived })
+    await navigate()
+  })
   if (kind === "delete-project") {
     const target = cache.projects.find(p => p.id === id)
     if (!target || !window.confirm(`Excluir “${target.titulo}” deste Studio? O roteiro, a narração e os vídeos locais serão removidos. Uma publicação no YouTube continuará no canal.`)) return
@@ -802,6 +808,7 @@ document.addEventListener("click", (event) => {
 
 content.addEventListener("change", (event) => {
   const field = event.target
+  if (field.id === "archived-projects") { cache.showArchived = field.checked; navigate() }
   if (field.matches(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
   const project = cache.current
   if (field.name === "visibility") {

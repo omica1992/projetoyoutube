@@ -695,3 +695,39 @@ audio { width: 100%; border-radius: 12px; filter: sepia(0.3) hue-rotate(110deg);
 .selected-channel-logo { width:clamp(56px,8vw,92px); aspect-ratio:1; object-fit:cover; border-radius:50%; }
 .selected-channel-info .selected-channel-link { margin-left:auto; }
 .rail-brand-text { min-width:0; overflow-wrap:anywhere; }
+
+/* Tema claro compartilhado pelo painel, independentemente do canal. */
+:root {
+  color-scheme:light;
+  --bg-0:#f6f8fc; --bg-1:#fff; --bg-2:#eef3fa;
+  --surface:#fff; --surface-2:#f2f5fa;
+  --line:#e0e6ef; --line-2:#cbd6e6;
+  --text:#19243a; --muted:#4c5c74; --faint:#64748b;
+  --gold:#2863db; --gold-hi:#2259c5; --gold-lo:#1748af;
+  --cream:#202d46; --emerald:#08694c; --teal:#166c67; --danger:#a82e38;
+  --shadow:0 8px 25px #2437580e,0 1px 2px #2437580b;
+}
+body { background:var(--bg-0); }
+body::before { display:none; }
+.rail,.rail.mobile-open,.topbar,.card,.hero-card,.kpi,.chat-sidebar,.chat-main,.chat-window,.drawer,.drawer-panel,.toast {
+  background:#fff; color:var(--text); box-shadow:var(--shadow);
+}
+.workspace-nav a[aria-current="page"],.workspace-nav a:hover,.rail.mobile-open .workspace-nav a[aria-current="page"] {
+  background:#e9f1ff; color:#1748af;
+}
+.rail-live,.model-picker,.subtabs,.seg,.fold,.pcb,.ypp-card,.kan-col {
+  background:#f3f6fb; color:var(--text); border-color:var(--line);
+}
+input,textarea,select,select option,input:focus,textarea:focus,select:focus { background:#fff; color:var(--text); border-color:var(--line-2); }
+input::placeholder,textarea::placeholder { color:#65738a; }
+.primary,.seg button.active,.subtabs button.active,.chat-send { background:#2863db; color:white; box-shadow:0 4px 10px #2259c526; }
+.ghost,.icon-btn { background:#fff; color:var(--text); border-color:var(--line-2); }
+.ghost:hover:not(:disabled),.icon-btn:hover:not(:disabled),.subtabs button:hover { background:#e9f1ff; color:#1748af; }
+.strategy-item,.kan-card,.video-card,.chat-ai-main,.chat-ai-row,.chat-composer-wrap,.chat-pill,.chat-user-bubble,.ypp-card.hit { background:#f5f7fc; color:var(--text); border-color:var(--line); box-shadow:none; }
+.chat-pill textarea { background:transparent; }
+.md,.md strong { color:var(--text); }
+.md pre,.md .table-wrap,code { background:#edf2fa; color:var(--text); }
+.md pre code { background:transparent; }
+#manual-topics { padding:0 1rem 1rem; }
+.chat-thread-item.active,.seg,.model-picker { background:#edf3ff; border-color:#d6e4fa; }
+.chat-workspace .chat-user-text,.chat-user-row .chat-bubble { color:var(--text); background:#e9f1ff; }

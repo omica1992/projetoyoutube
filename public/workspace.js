@@ -15,7 +15,7 @@ function renderWorkspace(hash, fromEditor = false) {
   const active = views.find((view) => view.id === id) ?? views[0]
   const section = destination.split("/")[0]
   const navId = active.id !== "producao" ? active.id : ({
-    inicio: "projetos", conectar: "canais", revisao: "projetos", comparar: "projetos", exportar: "projetos",
+    pacote: "criar", inicio: "projetos", conectar: "canais", revisao: "projetos", comparar: "projetos", exportar: "projetos",
     publicar: "projetos", gerando: "projetos",
   })[section] || section
   const currentLink = links.find(link => link.hash === "#" + navId)
@@ -35,7 +35,9 @@ function renderWorkspace(hash, fromEditor = false) {
       else editor.contentWindow.postMessage({ type: "studio:navigate", data: destination }, location.origin)
     }
   }
-  if (title) title.textContent = currentLink?.querySelector("span")?.textContent || active.getAttribute("aria-label") || "FatoNexo"
+  const manualTopics = document.querySelector("#manual-topics")
+  if (manualTopics) manualTopics.hidden = section !== "pautas"
+  if (title) title.textContent = section === "pacote" ? "Pacote de edição" : currentLink?.querySelector("span")?.textContent || active.getAttribute("aria-label") || "FatoNexo"
   window.dispatchEvent(new CustomEvent("workspace:change", { detail: { id: active.id } }))
 }
 
