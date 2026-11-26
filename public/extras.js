@@ -531,5 +531,7 @@ function onWorkspace(id) {
   if (id === "integracoes" && !oauthLoaded) loadOAuthCard()
 }
 window.addEventListener("workspace:change", (e) => onWorkspace(e.detail?.id))
+const initialProductionTab = { "#pacote": "prod-pacote", "#publicacao": "prod-publicar" }[location.hash]
+if (initialProductionTab) document.querySelector(`[data-subtarget="${initialProductionTab}"]:not(.active)`)?.click()
 loadOAuthCard()
 onWorkspace(window.location.hash.slice(1) || "canal")
