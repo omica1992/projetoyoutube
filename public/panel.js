@@ -1,4 +1,4 @@
-import { openWorkspace } from "./workspace.js"
+import { openWorkspace, openStudioScript } from "./workspace.js"
 import { $, $$, el, icon, btn, extLink, numFmt, compact, apiJson, toast, renderMarkdown, hhmm } from "./ui.js"
 import { initLive, getSnapshot, getAvatar, YPP_VIEWS_KEY, ringMarkup } from "./live.js"
 
@@ -450,12 +450,7 @@ $("#btn-use-adaptation").addEventListener("click", () => {
   const ad = lastAnalysis?.analise?.adaptacao_fatonexo
   if (!ad) return
   closeDrawers()
-  newScript()
-  openWorkspace("producao", true)
-  $("#pauta").value = toText(ad.pauta || ad.titulo)
-  $("#script-promessa").value = toText(ad.promessa)
-  $("#script-contexto").value = toText(ad.contexto)
-  $("#script-entrega").value = toText(ad.entrega)
+  sendAdaptationToStudio(ad)
   toast("Adaptação enviada para o editor de roteiro")
 })
 $("#btn-save-adaptation-idea").addEventListener("click", () => {
@@ -514,13 +509,14 @@ ideaForm.addEventListener("submit", (e) => {
   toast("Pauta salva")
 })
 
+function sendAdaptationToStudio(adaptation) {
+  const title = toText(adaptation.pauta || adaptation.titulo)
+  const idea = [title, adaptation.promessa, adaptation.contexto, adaptation.entrega].map(toText).filter(Boolean).join("\n")
+  openStudioScript({ title, idea })
+}
+
 function useIdeaInScript(idea) {
-  newScript()
-  openWorkspace("producao", true)
-  $("#pauta").value = idea.title || ""
-  $("#script-promessa").value = idea.promise || ""
-  $("#script-contexto").value = idea.context || ""
-  $("#script-entrega").value = idea.payoff || ""
+  openStudioScript({ title: idea.title, idea: [idea.title, idea.promise, idea.context, idea.payoff].filter(Boolean).join("\n") })
   toast("Pauta enviada para o roteiro")
 }
 function moveIdea(idea, dir) {
@@ -625,7 +621,7 @@ $("#btn-new-script").addEventListener("click", () => {
 })
 
 function loadSavedScript(entry) {
-  openWorkspace("producao", true)
+  if (entry.id) openStudioScript({ id: entry.id })
   currentRoteiroId = entry.id || null
   const r = entry.roteiro || {}
   $("#pauta").value = entry.pauta || r.titulo || ""
@@ -1035,10 +1031,17 @@ function renderChat(messages, { typing = false, animateId = null } = {}) {
       toScript.type = "button"
       toScript.append(icon("pen"), el("span", "Usar no roteiro"))
       toScript.addEventListener("click", () => {
-        newScript()
-        openWorkspace("producao", true)
-        scriptText.value = m.text
-        updateMeter()
+        if (m.panelAction?.savedDraft?.id) return openStudioScript({ id: m.panelAction.savedDraft.id })
+        let script = m.text.trim()
+        if (/<(?:!doctype|html|body|main|section)\b/i.test(script)) {
+          const template = document.createElement("template")
+          template.innerHTML = script
+          for (const node of template.content.querySelectorAll("script, style, template")) node.remove()
+          const narration = template.content.querySelector('[data-roteiro], [data-narracao], #roteiro, #narracao')
+          if (!narration?.textContent.trim()) return toast("Peça ao Chat IA a narração em texto para enviar ao roteiro.")
+          script = narration.textContent.trim()
+        }
+        openStudioScript({ script })
       })
       actions.append(copy, toScript)
       main.append(actions)
@@ -1300,12 +1303,7 @@ async function loadAcervo({ chat = false } = {}) {
     listItems("#history-analyses", vAnalises.map((a) => {
       const ad = a.analise?.adaptacao_fatonexo
       return makeCard(el("strong", a.video?.title || a.video?.id || "Vídeo"), [a.video?.channel, toText(a.analise?.promessa).slice(0, 110), new Date(a.createdAt).toLocaleString("pt-BR")].filter(Boolean).join(" · "), btn("Ver análise", () => showSavedAnalysis(a), "primary", "eye"), ad && btn("Roteiro", () => {
-        newScript()
-        openWorkspace("producao", true)
-        $("#pauta").value = toText(ad.pauta || ad.titulo)
-        $("#script-promessa").value = toText(ad.promessa)
-        $("#script-contexto").value = toText(ad.contexto)
-        $("#script-entrega").value = toText(ad.entrega)
+        sendAdaptationToStudio(ad)
       }, "ghost", "pen"), ...archDel("analises", a))
     }), "Nenhuma análise salva ainda.", "film")
 

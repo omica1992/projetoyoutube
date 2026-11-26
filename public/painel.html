@@ -332,15 +332,15 @@
 
 <!-- ============================ ROTEIRO ============================ -->
 <section id="producao" class="workspace-view" data-workspace aria-label="Roteiro" hidden>
-  <div class="toolbar"><a class="primary" href="/criar.html"><svg class="ic"><use href="#i-film"/></svg>Criar Short no Fora do Nível</a></div>
   <div class="subtabs" data-subtabs="producao" role="tablist" aria-label="Etapas de roteiro e publicação">
-    <button type="button" class="active" data-subtarget="prod-editor">1. Escrever &amp; Voz</button>
-    <button type="button" data-subtarget="prod-pacote">2. Título &amp; Pacote (.srt)</button>
-    <button type="button" data-subtarget="prod-publicar">3. Publicar no YouTube</button>
+    <button type="button" class="active" data-subtarget="prod-editor">Editor, projetos e voz</button>
+    <button type="button" data-subtarget="prod-pacote">Título e pacote (.srt)</button>
+    <button type="button" data-subtarget="prod-publicar">Publicar no YouTube</button>
   </div>
 
   <div class="subpanel" data-subgroup="producao" data-subpanel="prod-editor">
-    <div class="script-layout">
+    <iframe id="studio-embedded" class="studio-embedded" title="Editor de roteiro e projetos" data-src="/editor.html?painel=1#criar"></iframe>
+    <div class="script-layout" hidden>
       <article class="card script-editor">
         <div class="card-head">
           <div>
@@ -435,7 +435,7 @@
           <div><h3>Pacote de edição (.srt + Cenas + Prompts)</h3><p class="meta">Puxa o roteiro do editor para baixar legenda .srt e prompts visuais por cena.</p></div>
           <button class="primary" id="btn-gerar-pacote" type="button">Gerar pacote</button>
         </div>
-        <div id="pacote-out" class="strategy-list"><p class="meta">Escreva ou selecione um roteiro na aba "1. Escrever &amp; Voz" e clique em Gerar pacote.</p></div>
+        <div id="pacote-out" class="strategy-list"><p class="meta">Escreva ou selecione um roteiro na aba "Editor, projetos e voz" e clique em Gerar pacote.</p></div>
       </article>
     </div>
   </div>

@@ -1,4 +1,4 @@
-import { openWorkspace } from "./workspace.js"
+import { openWorkspace, openStudioScript } from "./workspace.js"
 
 const searchForm = document.querySelector("#youtube-search")
 const connection = document.querySelector("#youtube-connection")
@@ -226,16 +226,8 @@ function render() {
 
 function useIdea(idea) {
   const reference = board.references.find((ref) => ref.id === idea.reference)
-  openWorkspace("producao")
-  document.querySelector("#pauta").value = idea.title
-  document.querySelector("#brief-pauta").value = [
-    idea.promise && `Promessa — ${idea.promise}`,
-    idea.context && `Contexto — ${idea.context}`,
-    idea.payoff && `Entrega — ${idea.payoff}`,
-    reference && `Referência de estrutura — ${reference.title} (${reference.url})`,
-    reference?.notes && `Teste inspirado na referência — ${reference.notes}`,
-  ].filter(Boolean).join("\n")
-  document.querySelector("#pauta").focus()
+  const ideaText = [idea.title, idea.promise, idea.context, idea.payoff, reference?.url, reference?.notes].filter(Boolean).join("\n")
+  openStudioScript({ title: idea.title, idea: ideaText })
 }
 
 searchForm.elements.type.addEventListener("change", () => {

@@ -685,3 +685,5 @@ audio { width: 100%; border-radius: 12px; filter: sepia(0.3) hue-rotate(110deg);
   .video-thumb-wrap { width: 100%; aspect-ratio: 16 / 10; }
   .short-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.studio-embedded { display:block; width:100%; min-height:70vh; border:0; border-radius:1rem; background:#101318; }

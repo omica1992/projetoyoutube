@@ -1,6 +1,9 @@
 const content = document.querySelector("#content")
 const header = document.querySelector("#header")
 const status = document.querySelector("#status")
+const embedded = window.parent !== window && new URLSearchParams(location.search).has("painel")
+let importedScript
+const sendToPanel = (type, data) => { if (embedded) window.parent.postMessage({ type, data }, location.origin) }
 const hosted = document.documentElement.dataset.runtime === "cloud"
 const apiRoot = "/api/criar"
 const cache = {
@@ -391,8 +394,21 @@ function redraw(page, project, pending) {
   }
   content.innerHTML = (pages[page] || home)()
   content.setAttribute("aria-busy", "false")
-  if (hosted && page === "canais") content.insertAdjacentHTML("beforeend", '<div class="actions"><a class="button" href="/painel.html#integracoes">Integração com o YouTube</a></div>')
-  if (page === "criar") { restoreDraft(project); loadVoiceLibrary(project) }
+  if (hosted && page === "canais") content.insertAdjacentHTML("beforeend", '<div class="actions"><a class="button" href="/#integracoes" target="_top">Integração com o YouTube</a></div>')
+  if (page === "criar") {
+    restoreDraft(project)
+    const form = document.querySelector("#create-form")
+    if (importedScript && !project) {
+      const { title, idea, script } = importedScript
+      for (const [name, value] of Object.entries({ title, idea, script })) {
+        if (typeof value === "string") form.elements[name].value = value.slice(0, form.elements[name].maxLength)
+      }
+      saveDraft(form)
+      importedScript = undefined
+    }
+    sendToPanel("studio:fields", { title: form.elements.title.value, script: form.elements.script.value })
+    loadVoiceLibrary(project)
+  }
   for (const field of content.querySelectorAll(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
   if (workspace) bindReview()
   if (page === "comparar") bindCompare()
@@ -799,13 +815,32 @@ content.addEventListener("input", (event) => {
     showVoiceOptions(form, form.elements.voice.value)
     return
   }
-  if (event.target.closest("#create-form")) saveDraft(event.target.form)
+  if (event.target.closest("#create-form")) {
+    const form = event.target.form
+    saveDraft(form)
+    sendToPanel("studio:fields", { title: form.elements.title.value, script: form.elements.script.value })
+  }
   if (event.target.id !== "project-search") return
   const terms = event.target.value.trim().toLocaleLowerCase("pt-BR")
   const found = cache.projects.filter((project) => project.titulo.toLocaleLowerCase("pt-BR").includes(terms))
   document.querySelector("#project-results").innerHTML = found.length || !terms ? projectCards(found) : '<p class="surface empty">Nenhum projeto encontrado.</p>'
 })
 
+if (embedded) {
+  document.documentElement.classList.add("embedded-studio")
+  const resize = new ResizeObserver(() => sendToPanel("studio:height", content.getBoundingClientRect().bottom + window.scrollY))
+  resize.observe(content)
+  resize.observe(header)
+  window.addEventListener("message", (event) => {
+    if (event.origin !== location.origin || event.source !== window.parent || event.data?.type !== "studio:script") return
+    const data = event.data.data
+    if (!data || typeof data !== "object") return
+    importedScript = data.id ? undefined : data
+    go("criar", typeof data.id === "string" ? data.id : undefined)
+    sendToPanel("studio:received")
+  })
+  sendToPanel("studio:ready")
+}
 window.addEventListener("hashchange", navigate)
 const query = new URLSearchParams(location.search)
 if (query.get("oauth") === "erro") notify(query.get("msg") || "A conexão com o YouTube não foi concluída.", true)

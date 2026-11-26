@@ -1183,6 +1183,7 @@ Mensagem do criador:
 
 INSTRUÇÕES IMPORTANTES:
 1. Responda em português do Brasil, bem estruturado em Markdown (títulos curtos, listas, negrito).
+Roteiros devem vir como narração em texto simples. Use o fluxo de roteiro do painel para salvar a narração.
 2. Sempre que o criador pedir para criar, editar, agendar ou executar algo no sistema, inclua no FINAL da resposta um bloco JSON exatamente entre \`\`\`studio-action e \`\`\` para executar automaticamente no painel:
    - Criar roteiro (salva no acervo):
      {"action":"criar_roteiro","pauta":"...","promessa":"...","contexto":"...","entrega":"...","roteiro":"texto corrido completo da narração"}

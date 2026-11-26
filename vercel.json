@@ -2,9 +2,10 @@
   "version": 2,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.js" },
-    { "source": "/", "destination": "/public/index.html" },
-    { "source": "/criar.html", "destination": "/public/index.html" },
-    { "source": "/studio.html", "destination": "/public/index.html" },
+    { "source": "/", "destination": "/public/painel.html" },
+    { "source": "/editor.html", "destination": "/public/index.html" },
+    { "source": "/criar.html", "destination": "/public/painel.html" },
+    { "source": "/studio.html", "destination": "/public/painel.html" },
     { "source": "/(.*)", "destination": "/public/$1" }
   ],
   "functions": {

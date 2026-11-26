@@ -427,3 +427,10 @@ option { color:var(--ink); background:var(--well); }
   .channel-hero .hero-identity { z-index:1; }
   .shell[data-page=pautas] .page-heading { background-position:60% center; }
 }
+
+.embedded-studio body { min-height:0; }
+.embedded-studio .shell { padding-bottom:1rem; }
+.embedded-studio .header { z-index:4; }
+@media (max-width:760px) {
+  .embedded-studio .header nav { position:static; box-shadow:none; }
+}

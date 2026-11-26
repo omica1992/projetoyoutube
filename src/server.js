@@ -40,12 +40,12 @@ if (!process.env.VERCEL) {
   app.use((req, res, next) => {
     const origin = studioRequestOrigin(req)
     if (!origin) return res.sendStatus(403)
-    if (origin.startsWith("https:") && !/^(?:\/$|\/criar\.html$|\/studio(?:\.html|-ui\.(?:js|css)|-kit-preview\.jpg|-(?:banner|concept|progress)\.webp)$|\/api\/criar(?:\/|$)|\/api\/jobs\/|\/api\/youtube\/oauth\/(?:start|callback)$|\/p\/fdn-)/.test(req.path)) {
+    if (origin.startsWith("https:") && !/^(?:\/$|\/(?:criar|editor)\.html$|\/studio(?:\.html|-ui\.(?:js|css)|-kit-preview\.jpg|-(?:banner|concept|progress)\.webp)$|\/api\/criar(?:\/|$)|\/api\/jobs\/|\/api\/youtube\/oauth\/(?:start|callback)$|\/p\/fdn-)/.test(req.path)) {
       return res.sendStatus(404)
     }
     next()
   })
-  app.get(["/", "/index.html", "/criar.html", "/studio.html"], (_req, res) => {
+  app.get(["/", "/index.html", "/criar.html", "/studio.html", "/editor.html"], (_req, res) => {
     const assets = ["studio-ui.js", "studio-ui.css", "studio-kit-preview.jpg"]
     const revision = assets.map((file) => fs.statSync(path.join(PUBLIC_DIR, file)).mtime.getTime().toString(36)).join("-")
     const document = fs.readFileSync(path.join(PUBLIC_DIR, "studio.html"), "utf8")
