@@ -78,6 +78,18 @@ function heading(title, detail = "", action = "") {
   return `<div class="page-heading"><div><h1>${html(title)}</h1>${detail ? `<p>${html(detail)}</p>` : ""}</div>${action}</div>`
 }
 
+function productionFlow(project, page) {
+  const hasVideo = Boolean(project?.urls?.mp4 || version(project))
+  const steps = [
+    ["criar", "Roteiro e voz", true],
+    ["revisao", "Revisar vídeo", hasVideo],
+    ["publicar", "Publicar", hasVideo || Boolean(project?.publicacao)],
+  ]
+  return `<ol class="production-flow" aria-label="Etapas de produção">${steps.map(([route, label, available]) => `<li${page === route ? ' aria-current="step"' : ""}>${
+    available && route !== page ? link(route, label, project?.id, "flow-link") : `<span>${label}</span>`
+  }</li>`).join("")}</ol>`
+}
+
 function link(page, label, id = "", classes = "button secondary") {
   return `<a class="${classes}" href="${include(page, id)}">${label}</a>`
 }
@@ -358,22 +370,39 @@ function deliveryPreview(media) {
       '<div class="poster-stage pending-preview"><span class="empty-mark" aria-hidden="true">▶</span><p>Seu vídeo aparecerá aqui.</p></div>'}</section>`
 }
 
+function publicationLibrary() {
+  const candidates = cache.projects.filter(p => !p.jobId && !p.publicacao && (p.urls?.mp4 || version(p)))
+  const published = cache.projects.filter(p => p.publicacao)
+  return `${heading("Publicação", "Escolha um vídeo que você já criou no Studio.")}
+    <section class="surface form publication-picker">
+      <h2>Vídeo do projeto</h2>
+      ${candidates.length ? `<form id="publication-picker" class="channel-picker">
+        <label>Selecione o vídeo<select name="projectId" required><option value="">Selecione…</option>
+          ${candidates.map(p => `<option value="${html(p.id)}">${html(p.titulo)} · ${p.urls.mp4 ? "MP4 pronto" : "Prévia pronta"}</option>`).join("")}
+        </select></label><button class="button">Revisar publicação</button>
+      </form>` : `<p>${hosted ? "A renderização na Vercel ainda está pendente. Os MP4 gerados no Studio local aparecem na biblioteca local." : "Gere uma prévia ou exporte um vídeo para começar."}</p>${link("projetos", "Abrir projetos")}`}
+      ${embedded ? '<a class="text-link" href="/#vincular" target="_top">Vincular um Short já publicado</a>' : ""}
+    </section>
+    ${published.length ? `<div class="section-heading"><h2>Publicações anteriores</h2></div>${projectCards(published)}` : ""}`
+}
+
 function publish(project) {
   const channel = channelProject(project)
   const media = project.urls.mp4
   if (project.publicacao) {
     const id = project.publicacao.videoId || project.publicacao.id
     const scheduled = Date.parse(project.publicacao.publishAt) > Date.now()
-    return `${link("exportar", "← Voltar à exportação", project.id, "text-link")}${heading(scheduled ? "Publicação agendada" : "Vídeo no YouTube", project.titulo)}
+    return `${link("publicacao", "← Voltar à publicação", "", "text-link")}${heading(scheduled ? "Publicação agendada" : "Vídeo no YouTube", project.titulo)}
     <div class="delivery">${deliveryPreview(media)}<div class="surface delivery-panel studio-empty"><span class="empty-mark" aria-hidden="true">✓</span><h2>${scheduled ? html(new Date(project.publicacao.publishAt).toLocaleString("pt-BR")) : project.publicacao.linked ? "Short vinculado" : "Envio concluído"}</h2>
     ${id ? `<a class="button" href="https://www.youtube.com/watch?v=${encodeURIComponent(id)}" target="_blank" rel="noopener">Abrir no YouTube</a>` : ""}</div></div>`
   }
-  return `${link("exportar", "← Voltar à exportação", project.id, "text-link")}${heading("Publicar no YouTube", project.titulo)}
+  return `${link("publicacao", "← Escolher outro vídeo", "", "text-link")}${heading("Publicar no YouTube", project.titulo)}
   <div class="delivery">${deliveryPreview(media)}
-  ${!media || !channel ? `<section class="surface form delivery-panel"><h2>Canal de destino</h2>
-    <p>${media ? "Vincule este projeto a um canal conectado para publicar." : "Exporte o MP4 final antes de enviar o vídeo."}</p>
-    ${cache.channels.length && !channel && !project.channelId ? `<form id="project-channel-form" class="channel-picker">
-      <label>Canal<select name="channelId">${cache.channels.map((item) => `<option value="${html(item.id)}">${html(item.title)}</option>`).join("")}</select></label><button class="button">Vincular canal ao projeto</button></form>` : !channel ? link("canais", "Meus canais") : link("exportar", "Ir para exportação", project.id)}</section>` : `
+  ${!media ? `<section class="surface form delivery-panel"><h2>Preparar MP4 final</h2>
+    ${version(project) ? '<p>O Studio vai renderizar a versão selecionada e voltar para esta tela.</p><button class="button" data-action="export" data-next="publicar">Gerar MP4 para publicação</button>' : link("criar", "Voltar ao roteiro", project.id)}
+    </section>` : !channel ? `<section class="surface form delivery-panel"><h2>Canal de destino</h2>
+    ${cache.channels.length && !project.channelId ? `<form id="project-channel-form" class="channel-picker">
+      <label>Canal<select name="channelId">${cache.channels.map((item) => `<option value="${html(item.id)}">${html(item.title)}</option>`).join("")}</select></label><button class="button">Vincular canal ao projeto</button></form>` : link("canais", "Conectar canal")}</section>` : `
     <form id="publish-form" class="surface form delivery-panel">
     <div class="channel-row destination-row">${avatar(channel, "medium")}<div><span>Canal de destino</span><h2>${html(channel.title)}</h2><p>${html(channel.handle || channel.id)}</p></div></div>
     <label>Título<input name="title" maxlength="100" value="${html(project.titulo)}" required></label>
@@ -394,12 +423,13 @@ function redraw(page, project, pending) {
   const pages = {
     inicio: home, pautas: topicPage, canais: channels, conectar: () => connect(pending, route()[1]), criar: () => create(project),
     gerando: () => generating(project), revisao: () => review(project), comparar: () => comparison(project),
-    exportar: () => exportVideo(project), publicar: () => publish(project),
+    exportar: () => exportVideo(project), publicacao: publicationLibrary, publicar: () => publish(project),
     projetos: () => `<div class="library-toolbar"><h1>Projetos</h1>${hosted ? `<label class="archive-filter"><input id="archived-projects" type="checkbox" ${cache.showArchived ? "checked" : ""}>Mostrar arquivados</label>` : ""}
       <label class="project-search"><span class="sr-only">Buscar projetos</span><input id="project-search" type="search" placeholder="Buscar projetos"></label>${link("criar", "Novo vídeo", "", "button")}</div>
       <div id="project-results" aria-live="polite">${projectCards(cache.projects)}</div>`,
   }
-  content.innerHTML = (pages[page] || home)()
+  const showFlow = page === "criar" || (project && ["revisao", "publicar"].includes(page))
+  content.innerHTML = (showFlow ? productionFlow(project, page) : "") + (pages[page] || home)()
   content.setAttribute("aria-busy", "false")
   if (embedded) for (const oauthLink of content.querySelectorAll('a[href^="/api/youtube/oauth/start"]')) oauthLink.target = "_top"
   if (hosted && page === "canais") content.insertAdjacentHTML("beforeend", '<div class="actions"><a class="button" href="/#integracoes" target="_top">Integração com o YouTube</a></div>')
@@ -442,7 +472,7 @@ async function navigate() {
     const pending = id && page === "conectar" ? await api(`/canais/pendente/${encodeURIComponent(id)}`) : null
     const channel = channelProject(project)
     if (project) cache.activeId = channel?.id || ""
-    if (["inicio", "projetos"].includes(page)) cache.projects = await api(`/projetos?canal=${encodeURIComponent(cache.activeId)}${page === "projetos" && cache.showArchived ? "&arquivados=1" : ""}`)
+    if (["inicio", "projetos", "publicacao"].includes(page)) cache.projects = await api(`/projetos?canal=${encodeURIComponent(cache.activeId)}${page === "publicacao" ? "&publicacao=1" : ""}${page === "projetos" && cache.showArchived ? "&arquivados=1" : ""}`)
     if (["pautas","inicio"].includes(page)) cache.book = await api("/pautas?canal="+encodeURIComponent(cache.activeId))
     if (request !== navigation) return
     cache.current = project
@@ -636,6 +666,7 @@ content.addEventListener("submit", (event) => {
   const form = event.target
   const data = Object.fromEntries(new FormData(form))
   const project = cache.current
+  if (form.id === "publication-picker" && data.projectId) go("publicar", data.projectId)
   if (form.id === "channel-profile-form") action(async () => {
     const profile = await api("/perfil-canal", { ref: data.ref.trim() })
     localStorage.setItem("studio-channel", profile.id)
@@ -803,7 +834,11 @@ document.addEventListener("click", (event) => {
   })
   if (kind === "export") action(async () => {
     const next = await jobResult(await projectApi(project, "exportar", {}))
-    if (route()[0] === "exportar") { cache.current = next; redraw("exportar", next) }
+    const destination = button.dataset.next || "exportar"
+    if (route()[0] === destination && cache.current?.id === next.id) {
+      cache.current = next
+      redraw(destination, next)
+    }
   })
 })
 
@@ -879,5 +914,7 @@ if (embedded) {
 }
 window.addEventListener("hashchange", navigate)
 const query = new URLSearchParams(location.search)
-if (query.get("oauth") === "erro") notify(query.get("msg") || "A conexão com o YouTube não foi concluída.", true)
+if (query.get("oauth") === "erro") notify(query.get("reason") === "access_denied"
+  ? "O Google não autorizou a conta. Em modo de teste, use uma conta adicionada em Público-alvo → Usuários de teste."
+  : query.get("msg") || "A conexão com o YouTube não foi concluída.", true)
 navigate()

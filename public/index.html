@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f6f8fc">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23061b19' stroke='%23f2b53f' stroke-width='4'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial,sans-serif' font-weight='900' font-size='26' fill='%23f2b53f'%3EFN%3C/text%3E%3C/svg%3E">
 <title>FatoNexo Studio · Central de Criação</title>
-<link rel="stylesheet" href="/style.css?v=claro-1">
+<link rel="stylesheet" href="/style.css?v=claro-2">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -347,7 +347,7 @@
   <div class="subtabs" data-subtabs="producao" hidden role="tablist" aria-label="Etapas de roteiro e publicação">
     <button type="button" class="active" data-subtarget="prod-editor">Editor, projetos e voz</button>
     <button type="button" data-subtarget="prod-pacote">Título e pacote (.srt)</button>
-    <button type="button" data-subtarget="prod-publicar">Publicar no YouTube</button>
+    <button type="button" data-subtarget="prod-vincular">Vincular Short publicado</button>
   </div>
 
   <div class="subpanel" data-subgroup="producao" data-subpanel="prod-editor">
@@ -466,34 +466,8 @@
     </div>
   </div>
 
-  <div class="subpanel" data-subgroup="producao" data-subpanel="prod-publicar" hidden>
-    <div class="two-col">
-      <article class="card" id="upload-youtube-card">
-        <div class="card-head">
-          <div><h3>Publicar Short no YouTube (OAuth)</h3><p class="meta">Envie o vídeo direto para o canal (Privado, Não listado, Público ou Agendado).</p></div>
-        </div>
-        <form id="upload-youtube-form" class="stack-form">
-          <div>
-            <label class="file-picker" for="up-video-file"><svg class="ic gold"><use href="#i-film"/></svg><span id="up-video-name">Escolher vídeo (.mp4 / .mov)</span></label>
-            <input id="up-video-file" name="video" type="file" accept="video/mp4,video/quicktime,video/*" required>
-          </div>
-          <label>Título do Short<input id="up-title" name="title" type="text" maxlength="100" placeholder="Ex.: 😱 Em Vênus... #Shorts" required></label>
-          <label>Descrição<textarea id="up-desc" name="description" rows="2" maxlength="5000" placeholder="Descrição (opcional)"></textarea></label>
-          <label>Tags<input id="up-tags" name="tags" type="text" placeholder="curiosidades, espaco, shorts"></label>
-          <div class="row">
-            <label>Visibilidade
-              <select id="up-privacy" name="privacyStatus">
-                <option value="private">Privado (rascunho seguro)</option>
-                <option value="unlisted">Não listado</option>
-                <option value="public">Público</option>
-              </select>
-            </label>
-            <label>Agendar (opcional)<input id="up-publish-at" name="publishAt" type="datetime-local"></label>
-          </div>
-          <div class="actions"><button class="primary" id="btn-up-youtube" type="submit">Publicar no YouTube</button></div>
-          <p class="meta" id="up-youtube-status" role="status"></p>
-        </form>
-      </article>
+  <div class="subpanel" data-subgroup="producao" data-subpanel="prod-vincular" hidden>
+    <div>
       <article class="card" id="publicar-roteiro-card">
         <div class="card-head">
           <div><h3>Fechar ciclo: Roteiro → Short Publicado</h3><p class="meta">Vincule um roteiro salvo ao Short já publicado para acompanhar as views reais.</p></div>
@@ -702,6 +676,11 @@
         <button class="ghost" id="btn-oauth-disconnect" type="button" hidden>Desconectar</button>
       </div>
       <p class="meta" id="oauth-status" role="status" style="margin-top:10px"></p>
+      <details class="fold">
+        <summary>Google exibiu erro 403 ao conectar?</summary>
+        <p class="meta">Se o app estiver em teste, adicione em Público-alvo → Usuários de teste a conta Google que administra o canal. Depois, repita a conexão usando essa conta.</p>
+        <p><a href="https://console.cloud.google.com/auth/audience" target="_blank" rel="noopener">Abrir Público-alvo no Google Cloud</a></p>
+      </details>
     </article>
   </div>
 

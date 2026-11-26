@@ -298,6 +298,9 @@ app.get("/api/youtube/oauth/callback", async (req, res) => {
   const target = studio ? "/criar.html" : "/painel.html"
   const hash = multiple ? "#canais" : studio ? "" : "#integracoes"
   res.clearCookie("studio_oauth", { path: "/api/youtube/oauth/callback" })
+  if (req.query.error === "access_denied") {
+    return res.redirect(`${target}?oauth=erro&reason=access_denied${hash}`)
+  }
   if (!code || !saved || saved[1] !== req.query.state || (studio && !isLocalStudio(req, true))) {
     return res.redirect(`${target}?oauth=erro${hash}`)
   }

@@ -331,6 +331,10 @@ async function loadOAuthCard() {
       : res.configured
         ? "Credenciais OAuth prontas. Clique acima para autorizar seu canal no Google."
         : "Credenciais OAuth não configuradas no servidor."
+    if (new URLSearchParams(location.search).get("reason") === "access_denied") {
+      st.textContent = "A autorização foi recusada pelo Google. Confira a conta e a lista de usuários de teste."
+      st.nextElementSibling.open = true
+    }
     oauthLoaded = true
   } catch (e) {
     st.textContent = e.message
@@ -372,44 +376,6 @@ async function loadAnalytics() {
 }
 
 $("#btn-analytics")?.addEventListener("click", loadAnalytics)
-
-$("#up-video-file")?.addEventListener("change", (e) => {
-  const f = e.currentTarget.files?.[0]
-  const lbl = $("#up-video-name")
-  if (lbl) lbl.textContent = f ? `${f.name} (${(f.size / 1048576).toFixed(1)} MB)` : "Escolher vídeo (.mp4 / .mov)"
-})
-
-$("#upload-youtube-form")?.addEventListener("submit", async (e) => {
-  e.preventDefault()
-  const status = $("#up-youtube-status")
-  const btn = $("#btn-up-youtube")
-  const file = $("#up-video-file")?.files?.[0]
-  if (!file) return toast("Escolha um vídeo para enviar", "error")
-  const fd = new FormData(e.currentTarget)
-  const roteiroId = $("#pub-roteiro-select")?.value
-  if (roteiroId) fd.append("roteiroId", roteiroId)
-  btn.disabled = true
-  status.textContent = "Enviando vídeo para o YouTube…"
-  try {
-    const r = await fetch("/api/painel/youtube/upload", { method: "POST", body: fd })
-    const data = await r.json().catch(() => ({}))
-    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`)
-    status.replaceChildren(
-      document.createTextNode(`Publicado (${data.uploaded.privacyStatus}): `),
-      extLink(data.uploaded.title, data.uploaded.url),
-    )
-    toast("Short enviado para o YouTube!")
-    e.currentTarget.reset()
-    const lbl = $("#up-video-name")
-    if (lbl) lbl.textContent = "Escolher vídeo (.mp4 / .mov)"
-    loadPublishList()
-  } catch (err) {
-    status.textContent = `Erro: ${err.message}`
-    toast(err.message, "error")
-  } finally {
-    btn.disabled = false
-  }
-})
 
 /* ==================== 9. AGENDA DE AÇÕES (#estrategia) ==================== */
 let agendaLoaded = false
@@ -494,12 +460,7 @@ for (const bar of document.querySelectorAll("[data-subtabs]")) {
       p.hidden = p.getAttribute("data-subpanel") !== target
     }
     if (target === "pesq-radar" && !radarLoaded) loadRadar(true)
-    if (target === "prod-publicar") {
-      loadPublishList()
-      const tInp = $("#up-title")
-      const pVal = $("#pauta")?.value?.trim()
-      if (tInp && !tInp.value && pVal) tInp.value = pVal
-    }
+    if (target === "prod-vincular") loadPublishList()
     if (target === "est-agenda" && !agendaLoaded) loadAgenda()
     if (target === "metas-retencao" && !analyticsLoaded) loadAnalytics()
     if (target === "metas-padroes" && !padroesLoaded) loadPadroes(false)
@@ -531,7 +492,7 @@ function onWorkspace(id) {
   if (id === "integracoes" && !oauthLoaded) loadOAuthCard()
 }
 window.addEventListener("workspace:change", (e) => onWorkspace(e.detail?.id))
-const initialProductionTab = { "#pacote": "prod-pacote", "#publicacao": "prod-publicar" }[location.hash]
+const initialProductionTab = { "#pacote": "prod-pacote", "#vincular": "prod-vincular" }[location.hash]
 if (initialProductionTab) document.querySelector(`[data-subtarget="${initialProductionTab}"]:not(.active)`)?.click()
 loadOAuthCard()
 onWorkspace(window.location.hash.slice(1) || "canal")

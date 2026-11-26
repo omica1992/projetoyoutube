@@ -731,3 +731,27 @@ input::placeholder,textarea::placeholder { color:#65738a; }
 #manual-topics { padding:0 1rem 1rem; }
 .chat-thread-item.active,.seg,.model-picker { background:#edf3ff; border-color:#d6e4fa; }
 .chat-workspace .chat-user-text,.chat-user-row .chat-bubble { color:var(--text); background:#e9f1ff; }
+
+/* Painel claro com hierarquia de estúdio e superfícies de edição. */
+:root {
+  --bg-0:#f4f6fb; --bg-2:#edf2fa; --line:#e0e7f1; --line-2:#cdd8ea;
+  --text:#17233c; --cream:#17233c; --gold:#2457c6; --gold-hi:#1e4cae;
+  --shadow:0 18px 40px -26px #172f5b47,0 1px 2px #172f5b0b;
+}
+body { background:radial-gradient(ellipse at 88% 4%,#e7eefc,transparent 45rem),var(--bg-0); }
+.rail { box-shadow:none; border-right:1px solid var(--line); }
+.rail-brand { margin-bottom:10px; }
+.workspace-nav { gap:5px; }
+.workspace-nav a { border-radius:11px; }
+.workspace-nav a[aria-current="page"] { box-shadow:inset 3px 0 #2457c6; font-weight:700; }
+.topbar { background:#ffffffed; box-shadow:0 1px 0 var(--line); }
+.topbar h1 { font-size:clamp(1.2rem,2vw,1.6rem); }
+body[data-workspace=producao] .model-picker { display:none; }
+.card,.kpi,.chat-sidebar,.chat-main,.drawer { border-color:var(--line); }
+.hero-card { background:linear-gradient(110deg,#fff 40%,#eaf1ff); }
+.primary,.chat-send { background:linear-gradient(136deg,#326be6,#184bbb); }
+.chat-thread-item.active { color:#1e4cae; background:#eaf1ff; }
+@media(max-width:760px){
+  .rail { border-right:0; }
+  .workspace-nav a[aria-current="page"] { box-shadow:inset 0 2px #2457c6; }
+}

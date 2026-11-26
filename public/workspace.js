@@ -4,8 +4,8 @@ const editor = document.querySelector("#studio-embedded")
 let pendingScript
 let editorRoute
 const title = document.querySelector("#page-title")
-const editorRoutes = /^(inicio|criar|projetos|pautas|canais|conectar|revisao|comparar|exportar|publicar|gerando)(?:\/|$)/
-const productionTabs = { pacote: "prod-pacote", publicacao: "prod-publicar" }
+const editorRoutes = /^(inicio|criar|projetos|pautas|canais|conectar|revisao|comparar|exportar|publicar|publicacao|gerando)(?:\/|$)/
+const productionTabs = { pacote: "prod-pacote", vincular: "prod-vincular" }
 
 function renderWorkspace(hash, fromEditor = false) {
   const target = hash.slice(1) || (location.pathname === "/" ? "criar" : "")
@@ -16,9 +16,10 @@ function renderWorkspace(hash, fromEditor = false) {
   const section = destination.split("/")[0]
   const navId = active.id !== "producao" ? active.id : ({
     pacote: "criar", inicio: "projetos", conectar: "canais", revisao: "projetos", comparar: "projetos", exportar: "projetos",
-    publicar: "projetos", gerando: "projetos",
+    publicar: "publicacao", vincular: "publicacao", gerando: "projetos",
   })[section] || section
   const currentLink = links.find(link => link.hash === "#" + navId)
+  document.body.dataset.workspace = active.id
   for (const view of views) view.hidden = view !== active
   for (const link of links) {
     if (link === currentLink) {
@@ -34,7 +35,7 @@ function renderWorkspace(hash, fromEditor = false) {
       if (!editor.hasAttribute("src")) {
         const url = new URL(editor.dataset.src, location.origin)
         const currentQuery = new URLSearchParams(location.search)
-        for (const key of ["oauth", "msg"]) {
+        for (const key of ["oauth", "msg", "reason"]) {
           if (currentQuery.has(key)) url.searchParams.set(key, currentQuery.get(key))
         }
         url.hash = destination

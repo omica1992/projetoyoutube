@@ -186,9 +186,15 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
   router.get("/projetos", route(async (req, res) => {
     const { originalId } = await listStudioChannels()
     const id = String(req.query.canal ?? "")
+    const forPublication = req.query.publicacao === "1"
     res.json([...projects.values()]
       .filter((project) => project.studio === "fora-do-nivel")
-      .filter((project) => (projectChannel(project, originalId) || "") === id)
+      .filter((project) => {
+        const owner = projectChannel(project, originalId) || ""
+        if (!forPublication) return owner === id
+        if (owner && id && owner !== id) return false
+        return Boolean(project.publicacao || selected(project) || (project.mp4 && fs.existsSync(path.join(projectDir(project.id), project.mp4))))
+      })
       .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))
       .map((project) => view(project)))
   }))
