@@ -147,7 +147,7 @@ export async function ytGetChannelOverview(channelRef = "@fatonexocuri", channel
   const avgViews = validViews.length ? Math.round(totalRecentViews / validViews.length) : null
   const sorted = [...validViews].sort((a, b) => a - b)
   const medianViews = sorted.length ? sorted[Math.floor(sorted.length / 2)] : null
-  const subs = ch.statistics?.subscriberCount != null ? Number(ch.statistics.subscriberCount) : null
+  const subs = !ch.statistics?.hiddenSubscriberCount && ch.statistics?.subscriberCount != null ? Number(ch.statistics.subscriberCount) : null
   return {
     channelId: ch.id,
     handle: ch.snippet?.customUrl || (channelRef.startsWith("@") ? channelRef : ""),
@@ -170,12 +170,13 @@ export async function ytResolveChannel(raw = "", request = fetch) {
   const s = String(raw).trim()
   const uc = s.match(/(UC[\w-]{20,})/)?.[1]
   const handle = s.match(/@([\p{L}\p{N}_.-]+)/u)?.[1] || (!s.startsWith("http") && !uc ? s.replace(/^@/, "") : "")
-  const params = uc ? { part: "snippet,brandingSettings", id: uc } : { part: "snippet,brandingSettings", forHandle: handle }
+  const params = uc ? { part: "snippet,brandingSettings,statistics", id: uc } : { part: "snippet,brandingSettings,statistics", forHandle: handle }
   const items = await list("channels", params, key, request)
   const ch = items[0]
   if (!ch) return null
   return { id: ch.id, title: ch.snippet?.title || s, handle: ch.snippet?.customUrl || (handle ? `@${handle}` : ""),
-    logo: bestThumb(ch.snippet?.thumbnails), banner: ch.brandingSettings?.image?.bannerExternalUrl || "" }
+    logo: bestThumb(ch.snippet?.thumbnails), banner: ch.brandingSettings?.image?.bannerExternalUrl || "",
+    subscribers: !ch.statistics?.hiddenSubscriberCount && ch.statistics?.subscriberCount != null ? Number(ch.statistics.subscriberCount) : null }
 }
 
 export async function ytGetVideoComments(videoId, maxResults = 20, request = fetch) {

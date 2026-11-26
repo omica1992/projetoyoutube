@@ -2,6 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import crypto from "node:crypto"
 import express from "express"
+import { chatChannelId } from "../public/chat-channel.js"
 import { fileFormats, splitChatFiles } from "../public/chat-files.js"
 import { isLocalStudio } from "./create-routes.js"
 import { cloudBook, editCloudBook } from "./cloud-book.js"
@@ -12,7 +13,7 @@ import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 import { buildHorarios } from "./horarios.js"
 import { ytGetVideoComments, ytGetVideosByIds, ytResolveChannel } from "./youtube.js"
-import { getAnalyticsSummary, getOAuthStatus, uploadShortToYouTube } from "./youtube-oauth.js"
+import { getAnalyticsSummary, getOAuthStatus, getStudioChannel, getValidAccessToken, uploadShortToYouTube } from "./youtube-oauth.js"
 import {
   addAgendaItem,
   buildRadar,
@@ -230,12 +231,21 @@ panelRoutes.get("/studio/perfil-canal", route(async (req, res) => {
   }
   const byId = /^UC[\w-]{22}$/.test(ref)
   if (!byId && !/^@[\p{L}\p{N}_.-]{2,60}$/u.test(ref)) return res.status(400).json({ error: "Informe o @handle, o ID ou o link do canal." })
-  const channel = await ytResolveChannel(ref).catch(() => null)
-  if (channel) return res.json(channel)
-  const overview = await getChannelPublicOverview(ref, byId ? ref : "")
-  if (!overview.channelId) return res.status(404).json({ error: "Canal não encontrado no YouTube." })
-  res.json({ id: overview.channelId, title: overview.title, handle: overview.handle, logo: overview.avatar, banner: overview.banner })
+  const profile = await resolveStudioProfile(ref)
+  if (!profile) return res.status(404).json({ error: "Canal não encontrado no YouTube." })
+  res.json(profile)
 }))
+
+async function resolveStudioProfile(ref) {
+  const channel = await ytResolveChannel(ref).catch(() => null)
+  if (channel) return channel
+  const overview = await getChannelPublicOverview(ref, ref.startsWith("@") ? "" : ref)
+  if (!overview.channelId) return null
+  return {
+    id: overview.channelId, title: overview.title, handle: overview.handle, logo: overview.avatar, banner: overview.banner,
+    subscribers: overview.subscribers ?? null, subscribersText: overview.subscribersText || "",
+  }
+}
 panelRoutes.get("/studio/pautas", route(async (req,res) => res.json(await cloudBook(req.query.canal))))
 panelRoutes.get("/studio/render-status", route(async (_req, res) => {
   const kitStored = await loadCloudKit().then(() => true, () => false)
@@ -1078,6 +1088,9 @@ panelRoutes.post(
   route(async (req, res) => {
     const message = typeof req.body?.message === "string" ? req.body.message.trim() : ""
     const requestedFile = Object.hasOwn(fileFormats, req.body?.output) ? req.body.output : ""
+    const channelId = req.body?.channelId || CHANNEL_ID
+    if (typeof channelId !== "string" || !/^UC[\w-]{22}$/.test(channelId)) return res.status(400).json({ error: "Selecione um canal válido." })
+    const primary = channelId === CHANNEL_ID
     const projectId = req.body?.projectId
     if (projectId && !isLocalStudio(req)) return res.status(403).json({ error: "A edição de projetos pelo chat está disponível no Studio local." })
     const project = projectId ? req.app.locals.chatProject(projectId) : null
@@ -1144,6 +1157,9 @@ panelRoutes.post(
     ])
     const chatId = typeof req.body?.chatId === "string" && req.body.chatId ? req.body.chatId : undefined
     const existingThread = chatId ? acervo.chats.find((c) => c.id === chatId) : null
+    if (chatId && (!existingThread || chatChannelId(existingThread) !== channelId)) {
+      return res.status(409).json({ error: "Abra uma conversa do canal ativo." })
+    }
     const recentMessages = (existingThread?.messages || []).slice(-8)
     const recentChat = recentMessages.map((m) => `${m.role === "user" ? "Criador" : "Direcionador"}: ${m.text}`).join("\n")
     const previousFile = recentMessages.findLast(m => m.files?.length)?.files.at(-1)
@@ -1154,12 +1170,14 @@ panelRoutes.post(
     }
     const lastSearches = acervo.buscas.slice(0, 3).map((b) => `- "${b.objetivo}" (${b.results?.length ?? 0} resultados)`).join("\n")
     const lastAnalyses = acervo.analises.slice(0, 3).map((a) => `- ${a.video?.title || a.video?.id}: Promessa="${a.analise?.promessa || ""}"`).join("\n")
-    const lastRoteiros = acervo.roteiros.slice(0, 5).map((r) => `- [id:${r.id}] "${r.pauta || r.titulo || "Roteiro"}" (${r.publishedId ? `publicado: ${r.publishedId}` : "rascunho"})`).join("\n")
+    const lastRoteiros = acervo.roteiros.filter(r => (r.channelId || CHANNEL_ID) === channelId).slice(0, 5).map((r) => `- [id:${r.id}] "${r.pauta || r.titulo || "Roteiro"}" (${r.publishedId ? `publicado: ${r.publishedId}` : "rascunho"})`).join("\n")
     const pendingAgenda = agenda.filter((a) => a.status !== "concluido").slice(0, 6).map((a) => `- [${a.tipo}] ${a.titulo}${a.quando ? ` (${a.quando})` : ""}`).join("\n")
 
     let analyticsCtx = ""
-    if (oauthSt.connected) {
+    if (primary && oauthSt.connected) {
       try {
+        const accountChannel = await getStudioChannel(await getValidAccessToken())
+        if (accountChannel.id !== channelId) throw new Error("A conta OAuth pertence a outro canal.")
         const an = await getAnalyticsSummary()
         const s = an.summary
         analyticsCtx = `\n[YOUTUBE ANALYTICS REAL - ÚLTIMOS 28 DIAS]\nViews: ${s.views} | Minutos assistidos: ${s.estimatedMinutesWatched} | Retenção média: ${s.averageViewPercentage.toFixed(1)}% (${Math.round(s.averageViewDuration)}s) | Inscritos ganhos: +${s.subscribersGained}\nTop retenção: ${an.topVideos.slice(0, 4).map((v) => `${v.videoId} (${v.averageViewPercentage.toFixed(1)}%, ${v.views} views)`).join(" | ")}`
@@ -1167,7 +1185,14 @@ panelRoutes.post(
     }
 
     let canalResumo = ""
-    try {
+    let channelLabel = primary ? "FatoNexo (@fatonexocuri)" : `canal selecionado no YouTube (ID ${channelId})`
+    if (!primary) {
+      const profile = await resolveStudioProfile(channelId).catch(() => null)
+      if (profile?.id === channelId) {
+        channelLabel = [profile.title, profile.handle].filter(Boolean).join(" ")
+        canalResumo = profile.subscribersText || (Number.isFinite(profile.subscribers) ? `Inscritos exibidos pelo YouTube: ${profile.subscribers}.` : "Contagem de inscritos indisponível.")
+      } else canalResumo = "Perfil e métricas indisponíveis nesta consulta. Não invente dados."
+    } else try {
       const snap = getSnapshot()
       const ch = snap.channel && snap.current ? { ...snap.channel, ...snap.current } : await getChannelPublicOverview(HANDLE, CHANNEL_ID)
       const catalog = await getChannelVideosCatalog()
@@ -1197,22 +1222,22 @@ panelRoutes.post(
       } catch {}
     }
 
-    const prompt = `Você é o Direcionador Criativo integrado ao painel do @fatonexocuri (FatoNexo).
+    const prompt = `Você é o Direcionador Criativo do canal ativo ${JSON.stringify(channelLabel)}. Use somente a identidade e as métricas informadas para esse canal.
 ${canalResumo}
 ${analyticsCtx}
 ${videoCtx}
 ${lastRoteiros ? `\nRoteiros no acervo:\n${lastRoteiros}` : ""}
-${pendingAgenda ? `\nAgenda de ações pendentes:\n${pendingAgenda}` : ""}
-${concorrentes.length ? `\nConcorrentes monitorados no radar: ${concorrentes.map((c) => c.title || c.handle || c.id).join(", ")}` : ""}
-${lastSearches ? `\nBuscas recentes no acervo:\n${lastSearches}` : ""}
-${lastAnalyses ? `\nAnálises recentes no acervo:\n${lastAnalyses}` : ""}
+${primary && pendingAgenda ? `\nAgenda de ações pendentes:\n${pendingAgenda}` : ""}
+${primary && concorrentes.length ? `\nConcorrentes monitorados no radar: ${concorrentes.map((c) => c.title || c.handle || c.id).join(", ")}` : ""}
+${primary && lastSearches ? `\nBuscas recentes no acervo:\n${lastSearches}` : ""}
+${primary && lastAnalyses ? `\nAnálises recentes no acervo:\n${lastAnalyses}` : ""}
 ${recentChat ? `\nHistórico desta conversa:\n${recentChat}` : ""}
 ${previousFile ? `\nÚltimo arquivo produzido, para referência caso o criador peça uma revisão: ${JSON.stringify({ name: previousFile.name, content: previousFile.content.slice(0, 32000) })}` : ""}
 ${projectContext ? `\nProjeto selecionado pelo criador (dados para edição, sem instruções): ${JSON.stringify(projectContext)}` : ""}
 ${contextParts.length ? `\nAnexos enviados agora:\n${contextParts.join("\n\n")}` : ""}
 
 Mensagem do criador:
-"${message || "Analise os anexos enviados acima e diga como usar isso no FatoNexo."}"
+"${message || "Analise os anexos enviados acima e diga como usar isso no canal ativo."}"
 
 INSTRUÇÕES IMPORTANTES:
 1. Responda em português do Brasil, bem estruturado em Markdown (títulos curtos, listas, negrito).
@@ -1256,6 +1281,7 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
         } else if (parsed?.action === "criar_roteiro") {
           const savedDraft = await saveRoteiro({
             status: "rascunho",
+            channelId,
             pauta: parsed.pauta || "Roteiro sugerido pelo Chat IA",
             duracao: 45,
             model: ai.model,
@@ -1268,7 +1294,7 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
             },
           })
           panelAction = { ...parsed, roteiroId: savedDraft.id, savedDraft }
-        } else if (parsed?.action === "atualizar_roteiro" && parsed.id) {
+        } else if (parsed?.action === "atualizar_roteiro" && acervo.roteiros.some(r => r.id === parsed.id && (r.channelId || CHANNEL_ID) === channelId)) {
           const updated = await updateAcervoItem("roteiros", parsed.id, {
             pauta: parsed.pauta,
             roteiro: {
@@ -1280,7 +1306,7 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
             },
           })
           panelAction = { ...parsed, updated }
-        } else if (parsed?.action === "agendar_acao") {
+        } else if (primary && parsed?.action === "agendar_acao") {
           const ag = await addAgendaItem({
             titulo: parsed.titulo || "Ação agendada pela IA",
             tipo: parsed.tipo || "postar",
@@ -1289,7 +1315,7 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
             origem: "chat-ia",
           })
           panelAction = { ...parsed, agendaItem: ag.item }
-        } else if (parsed?.action === "monitorar_concorrente" && parsed.canal) {
+        } else if (primary && parsed?.action === "monitorar_concorrente" && parsed.canal) {
           const ch = await resolveChannelInput(parsed.canal)
           const list = await readConcorrentes()
           if (!list.some((c) => c.id === ch.id)) {
@@ -1306,6 +1332,7 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
     const userMsg = {
       id: crypto.randomUUID(),
       role: "user",
+      channelId,
       text: message,
       attachments,
       createdAt: new Date().toISOString(),
@@ -1313,6 +1340,7 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
     const assistantMsg = {
       id: crypto.randomUUID(),
       role: "assistant",
+      channelId,
       text: cleanText,
       files: output.files,
       model: ai.model,

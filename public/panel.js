@@ -1,4 +1,5 @@
-import { openWorkspace, openStudioScript } from "./workspace.js"
+import { primaryChannelId, chatChannelId } from "./chat-channel.js"
+import { openWorkspace, openStudioScript, getActiveChannelProfile } from "./workspace.js"
 import { fileFormats, splitChatFiles } from "./chat-files.js"
 import { $, $$, el, icon, btn, extLink, numFmt, compact, apiJson, toast, renderMarkdown, hhmm } from "./ui.js"
 import { initLive, getSnapshot, getAvatar, YPP_VIEWS_KEY, ringMarkup } from "./live.js"
@@ -908,33 +909,45 @@ window.addEventListener("workspace:change", (event) => {
 if (location.hash === "#chat") loadChatProjects()
 const chatFiles = $("#chat-files")
 
+const currentChatChannel = () => getActiveChannelProfile()?.id || primaryChannelId
+const chatAvatar = () => currentChatChannel() === primaryChannelId ? getAvatar() : getActiveChannelProfile()?.logo
+const chatInitials = () => getActiveChannelProfile()?.title?.trim().split(/\s+/).slice(0,2).map(word => word[0]).join("").toUpperCase() || "FN"
+
+window.addEventListener("studio:active-channel", () => {
+  activeChatId = null
+  lastChatList = []
+  $("#chat-active-title").textContent = "Nova conversa"
+  renderChatSidebar()
+  renderChat([])
+})
+
 function aiAvatar() {
   const wrap = el("div", "", "chat-ai-avatar")
-  const url = getAvatar()
+  const url = chatAvatar()
   if (url) {
     const img = document.createElement("img")
     img.referrerPolicy = "no-referrer"
     img.alt = ""
-    img.addEventListener("error", () => wrap.replaceChildren(el("b", "FN")), { once: true })
+    img.addEventListener("error", () => wrap.replaceChildren(el("b", chatInitials())), { once: true })
     img.src = url
     wrap.append(img)
-  } else wrap.append(el("b", "FN"))
+  } else wrap.append(el("b", chatInitials()))
   return wrap
 }
 
 function welcomeNode() {
   const box = el("div", "", "chat-welcome")
   const logo = el("div", "", "chat-logo")
-  const url = getAvatar()
+  const url = chatAvatar()
   if (url) {
     const img = document.createElement("img")
     img.referrerPolicy = "no-referrer"
     img.alt = ""
-    img.addEventListener("error", () => logo.replaceChildren(el("b", "FN")), { once: true })
+    img.addEventListener("error", () => logo.replaceChildren(el("b", chatInitials())), { once: true })
     img.src = url
     logo.append(img)
-  } else logo.append(el("b", "FN"))
-  box.append(logo, el("h3", "Como posso ajudar o FatoNexo hoje?"), el("p", "Eu vejo os números do canal, crio roteiros e pautas, busco canais e entendo áudios, imagens e arquivos que você enviar.", "meta"))
+  } else logo.append(el("b", chatInitials()))
+  box.append(logo, el("h3", `Como posso ajudar o canal ${getActiveChannelProfile()?.title || "FatoNexo"} hoje?`), el("p", "Eu vejo os números do canal, crio roteiros e pautas, busco canais e entendo áudios, imagens e arquivos que você enviar.", "meta"))
   const starters = [
     ["trend", "Diagnostique o @fatonexocuri com os números de hoje"],
     ["search", "Ache 5 canais de curiosidades que já monetizam e diga o que copiar"],
@@ -1133,6 +1146,7 @@ function renderChatSidebar() {
   const q = ($("#chat-search").value || "").trim().toLowerCase()
   const showArchived = $("#chat-show-archived")?.checked
   const list = allChats.filter((c) => {
+    if (chatChannelId(c) !== currentChatChannel()) return false
     if (!showArchived && c.archived) return false
     if (q && !(c.title || "").toLowerCase().includes(q)) return false
     return true
@@ -1242,6 +1256,7 @@ chatFiles.addEventListener("change", () => {
 $("#chat-form").addEventListener("submit", async (e) => {
   e.preventDefault()
   if (chatBusy) return
+  const channelId = currentChatChannel()
   const message = chatInput.value.trim()
   const files = [...(chatFiles.files || [])]
   if (!message && !files.length) return
@@ -1252,6 +1267,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
   renderChat([...lastChatList, { role: "user", text: message || `(anexos: ${files.map((f) => f.name).join(", ")})`, attachments: [], createdAt: new Date().toISOString() }], { typing: true })
   const fd = new FormData()
   fd.append("message", message)
+  fd.append("channelId", channelId)
   fd.append("output", $("#chat-output").value)
   if ($("#chat-project").value) fd.append("projectId", $("#chat-project").value)
   fd.append("model", currentModel())
@@ -1261,6 +1277,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
   chatInput.style.height = "auto"
   try {
     const data = await apiJson("/api/painel/chat", { method: "POST", body: fd })
+    if (channelId !== currentChatChannel()) return
     chatFiles.value = ""
     $("#chat-file-preview").hidden = true
     activeChatId = data.thread?.id || activeChatId
@@ -1275,6 +1292,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
     }
     $("#chat-status").textContent = `Respondido por ${data.assistantMsg?.model || "o Direcionador"} · conversa salva`
   } catch (error) {
+    if (channelId !== currentChatChannel()) return
     renderChat(lastChatList)
     chatInput.value = message
     $("#chat-status").textContent = error.message
@@ -1326,8 +1344,9 @@ async function loadAcervo({ chat = false } = {}) {
     $("#count-analyses").textContent = vAnalises.length
 
     if (chat) {
-      if (!activeChatId && allChats.length) activeChatId = allChats.find((c) => !c.archived)?.id || allChats[0].id
-      const thread = allChats.find((c) => c.id === activeChatId)
+      const channelChats = allChats.filter(c => chatChannelId(c) === currentChatChannel())
+      const thread = channelChats.find(c => c.id === activeChatId) || channelChats.find(c => !c.archived)
+      activeChatId = thread?.id || null
       lastChatList = thread?.messages || []
       $("#chat-active-title").textContent = thread?.title || "Direcionador IA"
       renderChat(lastChatList)

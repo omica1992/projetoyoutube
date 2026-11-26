@@ -1,3 +1,5 @@
+import { primaryChannelId } from "./chat-channel.js"
+
 const views = [...document.querySelectorAll("[data-workspace]")]
 const links = [...document.querySelectorAll(".workspace-nav a")]
 const editor = document.querySelector("#studio-embedded")
@@ -99,7 +101,9 @@ window.addEventListener("message", (event) => {
   }
 })
 
-const primaryChannelId = "UCClrO3uvc5-H6NPc6alEHDw"
+let activeChannelProfile = null
+export const getActiveChannelProfile = () => activeChannelProfile
+const subscriberFormat = new Intl.NumberFormat("pt-BR")
 const channelDashboard = document.querySelector("#canal")
 const channelHero = document.querySelector("#selected-channel-hero")
 const brandTitle = document.querySelector(".rail-brand-text strong")
@@ -122,13 +126,22 @@ function loadChannelImage(img, url, fallback) {
 
 function updateChannelIdentity(profile) {
   if (!channelHero || !channelDashboard) return
+  const changed = activeChannelProfile?.id !== profile?.id
+  if (!changed && profile) profile = { ...activeChannelProfile, ...profile }
+  activeChannelProfile = profile || null
+  if (profile && profile.id === localStorage.getItem("studio-channel")) {
+    localStorage.setItem("studio-active-profile", JSON.stringify(profile))
+  }
   const alternate = Boolean(profile?.id && profile.id !== primaryChannelId)
+  const eyebrow = document.querySelector(".topbar-title .eyebrow")
+  if (eyebrow) eyebrow.textContent = alternate ? profile.title : "FatoNexo Studio"
   channelDashboard.classList.toggle("alternate-channel", alternate)
   channelHero.hidden = !alternate
   if (!alternate) {
     if (brandTitle && originalBrandTitle) brandTitle.replaceChildren(...originalBrandTitle.cloneNode(true).childNodes)
     if (brandHandle) brandHandle.textContent = originalBrandHandle
     window.dispatchEvent(new Event("studio:reset-brand"))
+    if (changed) window.dispatchEvent(new Event("studio:active-channel"))
     return
   }
   if (brandTitle) brandTitle.textContent = profile.title
@@ -139,7 +152,19 @@ function updateChannelIdentity(profile) {
   loadChannelImage(channelHero.querySelector(".selected-channel-logo"), profile.logo)
   loadChannelImage(channelHero.querySelector(".selected-channel-cover"), profile.banner)
   loadChannelImage(document.querySelector("#brand-avatar"), profile.logo, document.querySelector("#brand-fallback"))
+  const count = profile.subscribersText || (Number.isFinite(profile.subscribers) ? `${subscriberFormat.format(profile.subscribers)} inscritos` : "")
+  document.querySelector("#rail-live-text").textContent = count || "Inscritos indisponíveis"
+  document.querySelector("#rail-live").classList.add("off")
+  if (changed) {
+    window.dispatchEvent(new Event("studio:active-channel"))
+    fetch("/api/painel/studio/perfil-canal?canal=" + encodeURIComponent(profile.id)).then(r => r.ok ? r.json() : null)
+      .then(current => {
+        if (current?.id === profile.id && activeChannelProfile?.id === profile.id) updateChannelIdentity({ ...profile, ...current })
+      }).catch(() => {})
+  }
 }
 
-const selectedProfile = JSON.parse(localStorage.getItem("studio-channel-profiles") || "[]").find(p => p.id === localStorage.getItem("studio-channel"))
+const savedProfile = JSON.parse(localStorage.getItem("studio-active-profile") || "null")
+const selectedProfile = [savedProfile, ...JSON.parse(localStorage.getItem("studio-channel-profiles") || "[]")]
+  .find(p => p && p.id === localStorage.getItem("studio-channel"))
 if (selectedProfile) updateChannelIdentity(selectedProfile)

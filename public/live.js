@@ -405,6 +405,7 @@ export async function requestInsight(force = false) {
 }
 
 function tick() {
+  if ($("#canal")?.classList.contains("alternate-channel")) return
   const rail = $("#rail-live")
   const status = $("#channel-status")
   const bar = $("#live-bar")
