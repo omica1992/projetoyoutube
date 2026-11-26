@@ -448,28 +448,28 @@ option { color:var(--ink); background:var(--well); }
 .channel-profile-form, #channel-profile-form { margin-top:1rem; }
 .channel-hero .hero-scene.channel-cover { opacity:1; object-position:center; }
 
-html {
+:root {
   color-scheme:light;
   --paper:#f6f8fc; --ink:#19243a; --muted:#4c5c74; --line:#e0e6ef;
   --blue:#2863db; --blue-hover:#1748af; --panel:#fff; --well:#fff;
   --lift:0 8px 24px #24375810;
 }
-html .surface,html .header { background:#fff; border-color:var(--line); color:var(--ink); }
-html input,html select,html textarea,html .story-editor,
-html .chat-form { background:#fff; border-color:#cbd6e6; color:var(--ink); box-shadow:none; }
-html input::placeholder,html textarea::placeholder { color:#64748b; }
-html :is(.button,.workspace-export,.chat-send) { background:#2863db; border-color:#2863db; color:#fff; box-shadow:0 4px 10px #2259c526; }
-html :is(.button.secondary,.scene-list button,.review-tabs button) { background:#fff; border-color:#cbd6e6; color:#1748af; }
-html .button:hover:not(:disabled) { background:#1748af; color:white; }
-html :is(.tag,.workspace-badge,.modality-tags>span,.chat-empty-icon,.empty-mark,.chat-attach,.featured-project .tag,.file-card,.destination-row,.placeholder) { color:#1748af; background:#e9f1ff; border-color:#d0dff9; }
-html :is(.review-stage,.poster-stage,.pending-preview,.message,.project-card:hover,.recent-projects a:hover) { background:#f1f5fb; color:var(--ink); border-color:var(--line); box-shadow:none; }
-html .message.user { background:#e9f1ff; }
-html :is(.channel-hero h1,.channel-hero p,.page-heading p,.idea-list h3) { color:var(--ink); text-shadow:none; }
-html .shell[data-page=pautas] .page-heading { border-color:var(--line); background:linear-gradient(90deg,#fff 12%,#fff 38%,#ffffffb3 80%),url('/studio-progress.webp') center 42%/cover; }
-html .notice { color:#704900; background:#fff4d7; }
-html .delete-project { color:#a82e38; }
-html .delete-project:hover { color:#79212c; }
-html :focus-visible { outline-color:#2863db; }
+:root .surface,:root .header { background:#fff; border-color:var(--line); color:var(--ink); }
+:root input,:root select,:root textarea,:root .story-editor,
+:root .chat-form { background:#fff; border-color:#cbd6e6; color:var(--ink); box-shadow:none; }
+:root input::placeholder,:root textarea::placeholder { color:#64748b; }
+:root :is(.button,.workspace-export,.chat-send) { background:#2863db; border-color:#2863db; color:#fff; box-shadow:0 4px 10px #2259c526; }
+:root :is(.button.secondary,.scene-list button,.review-tabs button) { background:#fff; border-color:#cbd6e6; color:#1748af; }
+:root .button:hover:not(:disabled) { background:#1748af; color:white; }
+:root :is(.tag,.workspace-badge,.modality-tags>span,.chat-empty-icon,.empty-mark,.chat-attach,.featured-project .tag,.file-card,.destination-row,.placeholder) { color:#1748af; background:#e9f1ff; border-color:#d0dff9; }
+:root :is(.review-stage,.poster-stage,.pending-preview,.message,.project-card:hover,.recent-projects a:hover) { background:#f1f5fb; color:var(--ink); border-color:var(--line); box-shadow:none; }
+:root .message.user { background:#e9f1ff; }
+:root :is(.channel-hero h1,.channel-hero p,.page-heading p,.idea-list h3) { color:var(--ink); text-shadow:none; }
+:root .shell[data-page=pautas] .page-heading { border-color:var(--line); background:linear-gradient(90deg,#fff 12%,#fff 38%,#ffffffb3 80%),url('/studio-progress.webp') center 42%/cover; }
+:root .notice { color:#704900; background:#fff4d7; }
+:root .delete-project { color:#a82e38; }
+:root .delete-project:hover { color:#79212c; }
+:root :focus-visible { outline-color:#2863db; }
 .archive-filter { display:flex; align-items:center; gap:.45rem; }
 .archive-filter input { width:auto; min-height:auto; accent-color:#2863db; }
 body { background:#f6f8fc; }
