@@ -3,6 +3,7 @@ import path from "node:path"
 import crypto from "node:crypto"
 import express from "express"
 import { cloudBook, editCloudBook } from "./cloud-book.js"
+import { loadCloudKit } from "./cloud-kit.js"
 import { goKey, goModels } from "./studio-go.js"
 import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
@@ -218,6 +219,10 @@ panelRoutes.get("/studio/config", route(async (_req,res) => {
 }))
 panelRoutes.get("/studio/vozes", route(async (_req,res) => res.json((await googleVoices(await providerKey("gemini"))).filter(v=>!/^voice(?:key)?_/.test(v.id)))))
 panelRoutes.get("/studio/pautas", route(async (_req,res) => res.json(await cloudBook())))
+panelRoutes.get("/studio/render-status", route(async (_req, res) => {
+  const kitStored = await loadCloudKit().then(() => true, () => false)
+  res.json({ kitStored, renderEnabled: false })
+}))
 panelRoutes.post("/studio/pautas", route(async (req,res) => {
   if (!hasSupabase()) return res.status(503).json({error:"Supabase indisponível."})
   res.json(await editCloudBook(req.body))
