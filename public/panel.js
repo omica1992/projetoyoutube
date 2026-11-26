@@ -1096,7 +1096,7 @@ function renderChat(messages, { typing = false, animateId = null } = {}) {
             att.append(img)
           } else {
             const chip = extLink("", a.url, "chat-file-chip")
-            chip.append(icon(a.kind === "audio" ? "mic" : "file"), document.createTextNode(a.name))
+            chip.append(icon(a.kind === "audio" ? "mic" : a.kind === "video" ? "film" : "file"), document.createTextNode(a.name))
             att.append(chip)
           }
         }
@@ -1108,6 +1108,9 @@ function renderChat(messages, { typing = false, animateId = null } = {}) {
     const main = el("div", "", "chat-ai-main")
     const meta = el("div", "", "chat-ai-meta")
     meta.append(el("strong", "Direcionador"), document.createTextNode(`${m.model || "MiMo-V2.6-Flash"} · ${hhmm(m.createdAt)}`))
+    if (m.agents?.length) {
+      for (const ag of m.agents) meta.append(el("span", ag, "chat-agent-badge"))
+    }
     const reply = m.files?.length ? m : splitChatFiles(m.text || "")
     main.append(meta)
     if (reply.text) {
@@ -1115,6 +1118,21 @@ function renderChat(messages, { typing = false, animateId = null } = {}) {
       if (m.id === animateId && !reply.files.length) reveal(body, reply.text, () => (chatBox.scrollTop = chatBox.scrollHeight))
       else body.append(renderMarkdown(reply.text))
       main.append(body)
+    }
+    if (m.images?.length) {
+      const gallery = el("div", "", "chat-ai-images")
+      for (const imgData of m.images) {
+        const card = el("div", "", "chat-ai-img-card")
+        const img = document.createElement("img")
+        img.src = imgData.url
+        img.alt = imgData.name || "Imagem"
+        img.loading = "lazy"
+        const link = extLink(imgData.generated ? "Baixar imagem" : (imgData.name || "Abrir imagem").slice(0, 36), imgData.url, "chat-file-chip")
+        if (imgData.generated) link.setAttribute("download", imgData.name || "imagem.png")
+        card.append(img, link)
+        gallery.append(card)
+      }
+      main.append(gallery)
     }
     if (reply.files.length) main.append(...reply.files.map(chatFileCard))
     const card = actionCard(m)

@@ -7,7 +7,8 @@ import { fileFormats, splitChatFiles } from "../public/chat-files.js"
 import { isLocalStudio } from "./create-routes.js"
 import { cloudBook, editCloudBook } from "./cloud-book.js"
 import { loadCloudKit } from "./cloud-kit.js"
-import { goKey, goModels } from "./studio-go.js"
+import { goKey, goModels, validGoModel } from "./studio-go.js"
+import { planBrowserVideo } from "./video-kit.js"
 import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
@@ -27,6 +28,7 @@ import {
   writeConcorrentes,
 } from "./extras.js"
 import { askFallback, parseJsonLoose } from "./opencode.js"
+import { askGeminiVision, extractVideoMedia, generateChatImage, runChatSubagents } from "./chat-tools.js"
 import { ARLO, googleVoices, generateNarration, providerKey, storeProviderKey, verifyGemini, CHANNEL_ID, VOICE_CATALOG } from "./panel-providers.js"
 import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey } from "./youtube.js"
 import { getChannelPublicOverview, getVideoDetailsAndTranscript, searchYouTubePublic } from "./youtube-public.js"
@@ -218,7 +220,27 @@ const route = (handler) => async (req, res) => {
 
 panelRoutes.get("/studio/config", route(async (_req,res) => {
   const [catalog,go,gemini] = await Promise.all([goModels(),goKey(),providerKey("gemini")])
-  res.json({ models:Object.keys(catalog),modelCatalog:catalog,voices:[ARLO,...VOICE_CATALOG],go:Boolean(go),gemini:Boolean(gemini),kit:false,cloud:true })
+  res.json({ models:Object.keys(catalog),modelCatalog:catalog,voices:[ARLO,...VOICE_CATALOG],go:Boolean(go),gemini:Boolean(gemini),kit:false,browserRender:true,cloud:true })
+}))
+panelRoutes.post("/studio/plano", route(async (req, res) => {
+  const title = String(req.body?.titulo || "").trim().slice(0, 100)
+  const script = String(req.body?.roteiro || "").trim().slice(0, 5000)
+  const duration = Number(req.body?.duracao)
+  const model = String(req.body?.model || "")
+  if (!title || !script) return res.status(400).json({ error: "Informe o título e o roteiro." })
+  if (!(duration > 5 && duration <= 180)) return res.status(400).json({ error: "Duração inválida para o vídeo." })
+  if (!validGoModel(model)) return res.status(400).json({ error: "Escolha um modelo válido para planejar a animação." })
+  if (!Array.isArray(req.body?.palavras) || !req.body.palavras.length || req.body.palavras.length > 4000) {
+    return res.status(400).json({ error: "Envie a sincronização das palavras da narração." })
+  }
+  const words = req.body.palavras.map((word) => ({
+    palavra: String(word?.palavra || "").trim().slice(0, 80),
+    inicio: Number(word?.inicio),
+    fim: Number(word?.fim),
+  })).filter((word) => word.palavra && Number.isFinite(word.inicio) && Number.isFinite(word.fim) && word.fim > word.inicio)
+  if (words.length < 3) return res.status(400).json({ error: "A sincronização de palavras está vazia." })
+  const storyboard = await planBrowserVideo({ model, title, script, duration, words })
+  res.json({ storyboard })
 }))
 panelRoutes.get("/studio/vozes", route(async (_req,res) => res.json((await googleVoices(await providerKey("gemini"))).filter(v=>!/^voice(?:key)?_/.test(v.id)))))
 panelRoutes.get("/studio/perfil-canal", route(async (req, res) => {
@@ -1106,6 +1128,7 @@ panelRoutes.post(
 
     const attachments = []
     const contextParts = []
+    const visionImages = []
 
     for (const file of files) {
       const ext = path.extname(file.originalname || "").toLowerCase()
@@ -1121,10 +1144,26 @@ panelRoutes.post(
       }
 
       const isAudio = file.mimetype?.startsWith("audio/") || /\.(mp3|wav|m4a|ogg|webm|aac|flac)$/i.test(ext)
+      const isVideo = file.mimetype?.startsWith("video/") || /\.(mp4|mov|mkv|avi)$/i.test(ext)
       const isImage = file.mimetype?.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(ext)
       const isText = file.mimetype?.startsWith("text/") || /\.(txt|md|csv|json|srt|vtt|log)$/i.test(ext)
 
-      if (isAudio) {
+      if (isVideo) {
+        let transcript = ""
+        if (process.env.VERCEL) {
+          transcript = "(Processamento de vídeo local disponível no Studio desktop.)"
+        } else {
+          try {
+            const media = await extractVideoMedia(destPath, chatUploadDir)
+            transcript = media.transcript || "(Sem fala detectada no vídeo)"
+            if (media.frameBase64) visionImages.push({ base64: media.frameBase64, mimeType: media.frameMime })
+          } catch (err) {
+            transcript = `(Não foi possível extrair áudio/quadro do vídeo: ${err.message})`
+          }
+        }
+        attachments.push({ kind: "video", name: file.originalname, url, transcript })
+        contextParts.push(`[VÍDEO ANEXADO: ${file.originalname}]\nTranscrição da fala:\n${transcript.slice(0, 8000)}`)
+      } else if (isAudio) {
         let transcript = ""
         if (process.env.VERCEL) {
           transcript = "(Transcrição local via Whisper disponível no Studio desktop; na Vercel, envie o texto ou resumo do áudio.)"
@@ -1139,6 +1178,12 @@ panelRoutes.post(
         attachments.push({ kind: "audio", name: file.originalname, url, transcript })
         contextParts.push(`[ÁUDIO ANEXADO: ${file.originalname}]\nTranscrição automática:\n${transcript.slice(0, 8000)}`)
       } else if (isImage) {
+        try {
+          const buf = file.buffer || fs.readFileSync(destPath)
+          if (buf?.length && buf.length <= 4_500_000) {
+            visionImages.push({ base64: buf.toString("base64"), mimeType: file.mimetype || "image/png" })
+          }
+        } catch {}
         attachments.push({ kind: "image", name: file.originalname, url })
         contextParts.push(`[IMAGEM ANEXADA: ${file.originalname}]`)
       } else if (isText) {
@@ -1154,11 +1199,12 @@ panelRoutes.post(
       }
     }
 
-    const [acervo, concorrentes, agenda, oauthSt] = await Promise.all([
+    const [acervo, concorrentes, agenda, oauthSt, subagents] = await Promise.all([
       readAcervo(),
       readConcorrentes().catch(() => []),
       readAgenda().catch(() => []),
       getOAuthStatus().catch(() => ({ connected: false })),
+      runChatSubagents({ message, channelId, primary }).catch(() => ({ contextBlocks: "", agentsUsed: [], foundImages: [] })),
     ])
     const chatId = typeof req.body?.chatId === "string" && req.body.chatId ? req.body.chatId : undefined
     const existingThread = chatId ? acervo.chats.find((c) => c.id === chatId) : null
@@ -1231,6 +1277,7 @@ panelRoutes.post(
 ${canalResumo}
 ${analyticsCtx}
 ${videoCtx}
+${subagents.contextBlocks ? `\n${subagents.contextBlocks}` : ""}
 ${lastRoteiros ? `\nRoteiros no acervo:\n${lastRoteiros}` : ""}
 ${primary && pendingAgenda ? `\nAgenda de ações pendentes:\n${pendingAgenda}` : ""}
 ${primary && concorrentes.length ? `\nConcorrentes monitorados no radar: ${concorrentes.map((c) => c.title || c.handle || c.id).join(", ")}` : ""}
@@ -1265,14 +1312,19 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
      {"action":"analisar_video","videoId":"XXXXXXXXXXX"}
    - Criar pauta na fila de Estratégia:
      {"action":"criar_pauta","title":"...","promise":"...","context":"...","payoff":"..."}
+   - Gerar/criar imagem (capa, cena, ilustração via Gemini):
+     {"action":"gerar_imagem","prompt":"descrição visual detalhada em inglês ou português"}
    Use no máximo UM bloco studio-action por resposta. Não use tabelas Markdown largas; prefira listas.`
 
     const models = pickModels(req.body?.model)
-    const ai = await askFallback({ models, text: prompt, timeoutMs: 75_000 })
+    const ai = (visionImages.length && (await askGeminiVision({ prompt, images: visionImages }))) || (await askFallback({ models, text: prompt, timeoutMs: 75_000 }))
 
     const output = splitChatFiles(ai.text, requestedFile)
     let cleanText = output.text
     let panelAction = null
+    const replyImages = [...(subagents.foundImages || []).slice(0, 4)]
+    const agentsUsed = [...(subagents.agentsUsed || [])]
+    if (visionImages.length && !agentsUsed.includes("Visão")) agentsUsed.push("Visão")
     const actionMatch = cleanText.match(/```studio-action\s*([\s\S]*?)```/i)
     if (actionMatch) {
       cleanText = cleanText.replace(actionMatch[0], "").trim()
@@ -1330,6 +1382,14 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
           panelAction = { ...parsed, added: ch }
         } else if (["buscar", "analisar_video", "criar_pauta"].includes(parsed?.action)) {
           panelAction = parsed
+        } else if (parsed?.action === "gerar_imagem" && parsed.prompt) {
+          try {
+            const img = await generateChatImage({ prompt: parsed.prompt, outDir: chatUploadDir })
+            replyImages.unshift({ name: img.name, url: img.url, generated: true })
+            if (!agentsUsed.includes("Gerador de Imagem")) agentsUsed.push("Gerador de Imagem")
+          } catch (err) {
+            cleanText += `\n\n*(Não foi possível gerar a imagem: ${err.message})*`
+          }
         }
       } catch {}
     }
@@ -1348,6 +1408,8 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
       channelId,
       text: cleanText,
       files: output.files,
+      images: replyImages,
+      agents: agentsUsed,
       model: ai.model,
       panelAction,
       createdAt: new Date().toISOString(),
