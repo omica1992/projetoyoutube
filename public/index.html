@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f6f8fc">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23061b19' stroke='%23f2b53f' stroke-width='4'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial,sans-serif' font-weight='900' font-size='26' fill='%23f2b53f'%3EFN%3C/text%3E%3C/svg%3E">
 <title>FatoNexo Studio · Central de Criação</title>
-<link rel="stylesheet" href="/style.css?v=claro-2">
+<link rel="stylesheet" href="/style.css?v=claro-4">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -336,7 +336,20 @@
           <textarea id="chat-input" name="message" rows="1" maxlength="4000" placeholder="Pergunte ou peça um roteiro…"></textarea>
           <button class="chat-send" type="submit" id="btn-chat-send" title="Enviar" aria-label="Enviar"><svg class="ic"><use href="#i-send"/></svg></button>
         </div>
-        <div class="chat-footer"><span class="meta" id="chat-status" role="status">Enter envia · Shift+Enter quebra linha</span></div>
+        <div class="chat-footer">
+          <label class="chat-output-format">Formato da resposta
+            <select id="chat-output" name="output">
+              <option value="">Automático</option>
+              <option value="html">Arquivo HTML (.html)</option>
+              <option value="md">Markdown (.md)</option>
+              <option value="txt">Texto (.txt)</option>
+              <option value="csv">Planilha CSV (.csv)</option>
+              <option value="json">Dados JSON (.json)</option>
+              <option value="srt">Legendas SRT (.srt)</option>
+            </select>
+          </label>
+          <span class="meta" id="chat-status" role="status">Enter envia · Shift+Enter quebra linha</span>
+        </div>
       </form>
     </div>
   </div>

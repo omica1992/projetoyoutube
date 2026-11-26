@@ -755,3 +755,21 @@ body[data-workspace=producao] .model-picker { display:none; }
   .rail { border-right:0; }
   .workspace-nav a[aria-current="page"] { box-shadow:inset 0 2px #2457c6; }
 }
+
+.chat-output-file {
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.8rem;
+  padding:.8rem; margin-top:.55rem; background:#fff; border:1px solid var(--line-2); border-radius:13px;
+}
+.chat-output-file > .ic { color:var(--gold); }
+.chat-output-file strong { display:block; overflow-wrap:anywhere; }
+.chat-output-file .actions { flex-wrap:wrap; }
+.chat-output-format { display:flex; align-items:center; flex-wrap:wrap; gap:.4rem; font-size:.77rem; color:var(--muted); }
+.chat-output-format select { width:auto; padding:.37rem .65rem; font-size:.78rem; }
+.chat-footer { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.35rem .8rem; }
+@media(max-width:500px) { .chat-output-file .actions { grid-column:2/-1; } }
+.chat-output-format { min-width:0; }
+.chat-output-format select { max-width:100%; }
+@media(max-width:600px) {
+  .model-picker { min-width:0; max-width:min(48vw,15rem); }
+  .model-picker select { min-width:0; max-width:100%; text-overflow:ellipsis; }
+}

@@ -2,6 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import crypto from "node:crypto"
 import express from "express"
+import { fileFormats, splitChatFiles } from "../public/chat-files.js"
 import { cloudBook, editCloudBook } from "./cloud-book.js"
 import { loadCloudKit } from "./cloud-kit.js"
 import { goKey, goModels } from "./studio-go.js"
@@ -1075,6 +1076,7 @@ panelRoutes.post(
   chatUpload.array("files", 5),
   route(async (req, res) => {
     const message = typeof req.body?.message === "string" ? req.body.message.trim() : ""
+    const requestedFile = Object.hasOwn(fileFormats, req.body?.output) ? req.body.output : ""
     const files = Array.isArray(req.files) ? req.files : []
     if (!message && !files.length) {
       return res.status(400).json({ error: "Escreva uma mensagem ou anexe um arquivo, áudio ou imagem." })
@@ -1138,7 +1140,9 @@ panelRoutes.post(
     ])
     const chatId = typeof req.body?.chatId === "string" && req.body.chatId ? req.body.chatId : undefined
     const existingThread = chatId ? acervo.chats.find((c) => c.id === chatId) : null
-    const recentChat = (existingThread?.messages || []).slice(-8).map((m) => `${m.role === "user" ? "Criador" : "Direcionador"}: ${m.text}`).join("\n")
+    const recentMessages = (existingThread?.messages || []).slice(-8)
+    const recentChat = recentMessages.map((m) => `${m.role === "user" ? "Criador" : "Direcionador"}: ${m.text}`).join("\n")
+    const previousFile = recentMessages.findLast(m => m.files?.length)?.files.at(-1)
     const lastSearches = acervo.buscas.slice(0, 3).map((b) => `- "${b.objetivo}" (${b.results?.length ?? 0} resultados)`).join("\n")
     const lastAnalyses = acervo.analises.slice(0, 3).map((a) => `- ${a.video?.title || a.video?.id}: Promessa="${a.analise?.promessa || ""}"`).join("\n")
     const lastRoteiros = acervo.roteiros.slice(0, 5).map((r) => `- [id:${r.id}] "${r.pauta || r.titulo || "Roteiro"}" (${r.publishedId ? `publicado: ${r.publishedId}` : "rascunho"})`).join("\n")
@@ -1194,6 +1198,7 @@ ${concorrentes.length ? `\nConcorrentes monitorados no radar: ${concorrentes.map
 ${lastSearches ? `\nBuscas recentes no acervo:\n${lastSearches}` : ""}
 ${lastAnalyses ? `\nAnálises recentes no acervo:\n${lastAnalyses}` : ""}
 ${recentChat ? `\nHistórico desta conversa:\n${recentChat}` : ""}
+${previousFile ? `\nÚltimo arquivo produzido, para referência caso o criador peça uma revisão: ${JSON.stringify({ name: previousFile.name, content: previousFile.content.slice(0, 32000) })}` : ""}
 ${contextParts.length ? `\nAnexos enviados agora:\n${contextParts.join("\n\n")}` : ""}
 
 Mensagem do criador:
@@ -1202,6 +1207,8 @@ Mensagem do criador:
 INSTRUÇÕES IMPORTANTES:
 1. Responda em português do Brasil, bem estruturado em Markdown (títulos curtos, listas, negrito).
 Roteiros devem vir como narração em texto simples. Use o fluxo de roteiro do painel para salvar a narração.
+Quando o criador pedir um arquivo, escreva uma resposta curta e coloque o conteúdo completo num bloco cercado de crases com cabeçalho "file nome-do-arquivo.ext". Use extensões html, md, txt, csv, json ou srt, conforme o pedido. O sistema transforma o bloco em um anexo para baixar. Para Markdown que contenha cercas de três crases, use quatro ou mais na cerca externa e repita a mesma quantidade ao fechar. Use um bloco por arquivo e coloque nele somente o conteúdo do arquivo. Se pedirem HTML, entregue um documento HTML completo.
+${requestedFile ? `O criador selecionou saída em arquivo .${requestedFile}. Entregue esse formato.` : ""}
 2. Sempre que o criador pedir para criar, editar, agendar ou executar algo no sistema, inclua no FINAL da resposta um bloco JSON exatamente entre \`\`\`studio-action e \`\`\` para executar automaticamente no painel:
    - Criar roteiro (salva no acervo):
      {"action":"criar_roteiro","pauta":"...","promessa":"...","contexto":"...","entrega":"...","roteiro":"texto corrido completo da narração"}
@@ -1222,7 +1229,8 @@ Roteiros devem vir como narração em texto simples. Use o fluxo de roteiro do p
     const models = pickModels(req.body?.model)
     const ai = await askFallback({ models, text: prompt, timeoutMs: 75_000 })
 
-    let cleanText = ai.text.trim()
+    const output = splitChatFiles(ai.text, requestedFile)
+    let cleanText = output.text
     let panelAction = null
     const actionMatch = cleanText.match(/```studio-action\s*([\s\S]*?)```/i)
     if (actionMatch) {
@@ -1290,6 +1298,7 @@ Roteiros devem vir como narração em texto simples. Use o fluxo de roteiro do p
       id: crypto.randomUUID(),
       role: "assistant",
       text: cleanText,
+      files: output.files,
       model: ai.model,
       panelAction,
       createdAt: new Date().toISOString(),

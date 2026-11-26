@@ -1,4 +1,5 @@
 import { openWorkspace, openStudioScript } from "./workspace.js"
+import { fileFormats, splitChatFiles } from "./chat-files.js"
 import { $, $$, el, icon, btn, extLink, numFmt, compact, apiJson, toast, renderMarkdown, hhmm } from "./ui.js"
 import { initLive, getSnapshot, getAvatar, YPP_VIEWS_KEY, ringMarkup } from "./live.js"
 
@@ -982,6 +983,27 @@ function reveal(container, text, onTick) {
   frame()
 }
 
+function chatFileCard(file) {
+  const extension = file.name.split(".").at(-1).toLowerCase()
+  const card = el("div", "", "chat-output-file")
+  const detail = el("div")
+  detail.append(el("strong", file.name), el("span", fileFormats[extension], "meta"))
+  const controls = el("div", "", "actions")
+  controls.append(btn("Baixar arquivo", () => {
+    const url = URL.createObjectURL(new Blob([file.content], { type: "application/octet-stream" }))
+    const download = document.createElement("a")
+    download.href = url
+    download.download = file.name
+    download.click()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+  }, "ghost", "download"))
+  if (extension === "txt" && file.content.length <= 5000) controls.append(btn("Usar no roteiro", () => {
+    openStudioScript({ script: file.content })
+  }, "ghost", "pen"))
+  card.append(icon("file"), detail, controls)
+  return card
+}
+
 function renderChat(messages, { typing = false, animateId = null } = {}) {
   if (!messages.length && !typing) return chatBox.replaceChildren(welcomeNode())
   const nodes = messages.map((m) => {
@@ -1011,13 +1033,18 @@ function renderChat(messages, { typing = false, animateId = null } = {}) {
     const main = el("div", "", "chat-ai-main")
     const meta = el("div", "", "chat-ai-meta")
     meta.append(el("strong", "Direcionador"), document.createTextNode(`${m.model || "MiMo-V2.6-Flash"} · ${hhmm(m.createdAt)}`))
-    const body = el("div")
-    if (m.id === animateId) reveal(body, m.text || "", () => (chatBox.scrollTop = chatBox.scrollHeight))
-    else body.append(renderMarkdown(m.text || ""))
-    main.append(meta, body)
+    const reply = m.files?.length ? m : splitChatFiles(m.text || "")
+    main.append(meta)
+    if (reply.text) {
+      const body = el("div")
+      if (m.id === animateId && !reply.files.length) reveal(body, reply.text, () => (chatBox.scrollTop = chatBox.scrollHeight))
+      else body.append(renderMarkdown(reply.text))
+      main.append(body)
+    }
+    if (reply.files.length) main.append(...reply.files.map(chatFileCard))
     const card = actionCard(m)
     if (card) main.append(card)
-    if (m.text) {
+    if (reply.text && !reply.files.length) {
       const actions = el("div", "", "chat-ai-actions")
       const copy = el("button", "")
       copy.type = "button"
@@ -1185,6 +1212,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
   renderChat([...lastChatList, { role: "user", text: message || `(anexos: ${files.map((f) => f.name).join(", ")})`, attachments: [], createdAt: new Date().toISOString() }], { typing: true })
   const fd = new FormData()
   fd.append("message", message)
+  fd.append("output", $("#chat-output").value)
   fd.append("model", currentModel())
   if (activeChatId) fd.append("chatId", activeChatId)
   for (const f of files) fd.append("files", f)
