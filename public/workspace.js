@@ -5,6 +5,18 @@ const links = [...document.querySelectorAll(".workspace-nav a")]
 const editor = document.querySelector("#studio-embedded")
 let pendingScript
 let editorRoute
+let mobileAction
+const nextAction = document.querySelector("#studio-next-action")
+const nextActionButton = nextAction?.querySelector("button")
+function updateNextAction() {
+  if (!nextAction) return
+  const creating = /^(?:producao|criar(?:\/.*)?)$/.test(location.hash.slice(1) || "criar")
+  nextAction.hidden = !creating || !mobileAction
+  if (mobileAction) nextActionButton.textContent = mobileAction.label
+}
+nextActionButton?.addEventListener("click", () => {
+  if (mobileAction) editor?.contentWindow.postMessage({ type:"studio:submit-create", data:mobileAction.intent }, location.origin)
+})
 const title = document.querySelector("#page-title")
 const editorRoutes = /^(inicio|criar|projetos|pautas|canais|conectar|revisao|comparar|exportar|publicar|publicacao|gerando)(?:\/|$)/
 const productionTabs = { pacote: "prod-pacote", vincular: "prod-vincular" }
@@ -22,6 +34,7 @@ function renderWorkspace(hash, fromEditor = false) {
   })[section] || section
   const currentLink = links.find(link => link.hash === "#" + navId)
   document.body.dataset.workspace = active.id
+  updateNextAction()
   for (const view of views) view.hidden = view !== active
   for (const link of links) {
     if (link === currentLink) {
@@ -93,6 +106,15 @@ window.addEventListener("message", (event) => {
     if (pendingScript) editor.contentWindow.postMessage({ type: "studio:script", data: pendingScript }, location.origin)
   }
   if (type === "studio:channel") updateChannelIdentity(data)
+  if (type === "studio:mobile-action") {
+    mobileAction = data && ["audio", "animate", "review"].includes(data.intent) ? data : null
+    updateNextAction()
+  }
+  if (type === "studio:mobile-status" && nextAction) {
+    const message = nextAction.querySelector("p")
+    message.textContent = data?.message || ""
+    message.classList.toggle("error", Boolean(data?.error))
+  }
   if (type === "studio:received") pendingScript = undefined
   if (type === "studio:height" && Number.isFinite(data)) editor.style.height = Math.max(360, Math.ceil(data)) + "px"
   if (type === "studio:fields") {

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f6f8fc">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23061b19' stroke='%23f2b53f' stroke-width='4'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-family='Arial,sans-serif' font-weight='900' font-size='26' fill='%23f2b53f'%3EFN%3C/text%3E%3C/svg%3E">
 <title>FatoNexo Studio · Central de Criação</title>
-<link rel="stylesheet" href="/style.css?v=claro-5">
+<link rel="stylesheet" href="/style.css?v=claro-6">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -327,6 +327,12 @@
           </div>
         </div>
       </div>
+      <div class="chat-context-bar">
+        <span class="chat-channel-context"><small>Canal ativo</small><strong id="chat-channel-name">FatoNexo</strong></span>
+          <label id="chat-project-target" class="chat-output-format" hidden>Projeto para editar
+            <select id="chat-project" name="projectId" form="chat-form"><option value="">Sem projeto</option></select>
+          </label>
+      </div>
       <div id="chat-messages" class="chat-scroll"></div>
       <form id="chat-form" class="chat-composer-wrap">
         <div id="chat-file-preview" class="history-chips" hidden></div>
@@ -337,9 +343,6 @@
           <button class="chat-send" type="submit" id="btn-chat-send" title="Enviar" aria-label="Enviar"><svg class="ic"><use href="#i-send"/></svg></button>
         </div>
         <div class="chat-footer">
-          <label id="chat-project-target" class="chat-output-format" hidden>Projeto para editar
-            <select id="chat-project" name="projectId"><option value="">Sem projeto</option></select>
-          </label>
           <label class="chat-output-format">Formato da resposta
             <select id="chat-output" name="output">
               <option value="">Automático</option>
@@ -718,6 +721,7 @@
 </section>
 
     </main>
+    <div id="studio-next-action" class="studio-next-action" hidden><p role="status"></p><button type="button" class="primary"></button></div>
   </div>
 </div>
 

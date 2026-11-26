@@ -42,6 +42,7 @@ function notify(message, error = false) {
   status.hidden = !message
   status.textContent = message ?? ""
   status.classList.toggle("error", error)
+  sendToPanel("studio:mobile-status", { message: message || "", error })
 }
 
 const youtubeImage = url => /^https:\/\/(?:[\w.-]+\.googleusercontent\.com|yt3\.ggpht\.com)\//i.test(url || "") ? url : ""
@@ -108,16 +109,16 @@ function projectState(project) {
 }
 
 function projectMedia(project, className = "") {
-  if (project.urls?.cover) return `<img class="project-cover ${className}" src="${html(project.urls.cover)}" alt="Capa ilustrada do projeto">`
   const item = version(project)
   const media = item ? videoUrl(project, item) : project.urls?.mp4
   return media ? `<video class="${className}" muted preload="metadata" playsinline src="${html(media)}#t=0.5" aria-hidden="true"></video>`
+    : project.urls?.cover ? `<img class="project-cover ${className}" src="${html(project.urls.cover)}" loading="lazy" alt="Capa do projeto">`
     : `<span class="placeholder ${className}" aria-hidden="true">▤</span>`
 }
 
 function projectCards(projects) {
   if (!projects.length) return `<div class="surface empty studio-empty"><span class="empty-mark" aria-hidden="true">▤</span><h2>Nenhum projeto ainda</h2><p>Crie um vídeo para começar.</p>${link("criar", "Novo vídeo", "", "button")}</div>`
-  return `<div class="projects">${projects.map((project) => `<article class="project-card surface"><a href="${projectLink(project)}" aria-label="Abrir ${html(project.titulo)}">${projectMedia(project)}</a><div class="project-card-body"><h2>${html(project.titulo)}</h2><p>${project.archived ? "Arquivado" : projectState(project)}</p><div class="card-tools"><a href="${projectLink(project)}">Abrir projeto →</a>${hosted ? `<button type="button" class="link-button" data-action="archive-project" data-id="${html(project.id)}">${project.archived ? "Restaurar" : "Arquivar"}</button>` : ""}<button type="button" class="delete-project" data-action="delete-project" data-id="${html(project.id)}" ${project.jobId ? "disabled" : ""}>Excluir</button></div></div></article>`).join("")}</div>`
+  return `<div class="projects">${projects.map((project) => `<article class="project-card surface"><a href="${projectLink(project)}" aria-label="Abrir ${html(project.titulo)}">${projectMedia(project)}</a><div class="project-card-body"><h2>${html(project.titulo)}</h2><p class="project-status"><span>${project.archived ? "Arquivado" : projectState(project)}</span></p><div class="card-tools"><a href="${projectLink(project)}">Abrir projeto →</a>${hosted ? `<button type="button" class="link-button" data-action="archive-project" data-id="${html(project.id)}">${project.archived ? "Restaurar" : "Arquivar"}</button>` : ""}<button type="button" class="delete-project" data-action="delete-project" data-id="${html(project.id)}" ${project.jobId ? "disabled" : ""}>Excluir</button></div></div></article>`).join("")}</div>`
 }
 
 function productionStep(p) {
@@ -275,20 +276,36 @@ function create(project) {
   return `${heading(project ? "Editar roteiro" : "Criar vídeo")}
     ${!config.go ? '<p class="notice">A chave do OpenCode Go ainda não está configurada no servidor.</p>' : ""}
     ${!config.kit ? `<p class="notice">${hosted ? "A renderização de animações 3D ainda não está disponível nesta hospedagem." : "O motor 3D precisa das dependências do kit para gerar as cenas."}</p>` : ""}
-    <div class="production-grid"><form id="create-form" class="surface form production-form">
-      ${project?.id ? "" : `<div class="story-tools"><label>Tema para a IA<input name="idea" placeholder="Escolha um tema ou escreva uma ideia" maxlength="2000"></label><input type="hidden" name="pautaId"><a class="text-link" href="#pautas">Sugerir temas com IA →</a>
-        <label>Duração alvo<select name="duration">${opts}</select></label>${modelOptions("IA do roteiro", "scriptModel", null, "opencode-go/deepseek-v4.1-flash")}
-        <button class="button secondary" name="intent" value="script" ${!config.go ? "disabled" : ""}>Gerar roteiro</button></div>`}
+    <div class="production-grid create-grid"><form id="create-form" class="surface form production-form">
+      ${project?.id ? "" : `<div class="script-start">
+        <label>Tema para a IA<input name="idea" placeholder="Escolha um tema ou escreva uma ideia" maxlength="2000"></label>
+        <input type="hidden" name="pautaId">
+        <div class="script-start-actions"><a class="text-link" href="#pautas">Sugerir temas com IA →</a><button class="button secondary" name="intent" value="script" ${!config.go ? "disabled" : ""}>Gerar roteiro</button></div>
+      </div>`}
       <label>Título<input name="title" maxlength="100" value="${html(project?.titulo)}" placeholder="Título do vídeo"></label>
-      <label class="story-editor">Roteiro<textarea name="script" rows="9" maxlength="5000" placeholder="Escreva ou cole a narração…">${html(project?.roteiro?.roteiro)}</textarea></label>
-      <div class="fields">${modelOptions("IA da animação", "animationModel", project?.animationModel, "opencode-go/kimi-k3")}<div><label>Buscar voz do Google<input id="voice-search" type="search" placeholder="Nome ou idioma, ex.: Arlo, pt-BR"></label><label>Voz<select name="voice">${voices}</select></label><small id="voice-count" aria-live="polite">${config.gemini ? "Carregando biblioteca…" : "Vozes locais"}</small></div></div>
-      ${project?.urls?.audio ? `<audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>${hosted ? `<a class="text-link" href="${html(project.urls.audio)}" download="narracao.wav">Baixar narração WAV</a>` : ""}` : ""}
+      <label class="story-editor">Roteiro<textarea name="script" rows="12" maxlength="5000" placeholder="Escreva ou cole a narração…">${html(project?.roteiro?.roteiro)}</textarea></label>
+      <details class="production-settings"><summary>Configurações de produção</summary>
+        <div class="fields">
+          ${project?.id ? "" : `<label>Duração alvo<select name="duration">${opts}</select></label>${modelOptions("IA do roteiro", "scriptModel", null, "opencode-go/deepseek-v4.1-flash")}`}
+          ${modelOptions("IA da animação", "animationModel", project?.animationModel, "opencode-go/kimi-k3")}
+          <div class="voice-settings"><label>Buscar voz do Google<input id="voice-search" type="search" placeholder="Nome ou idioma, ex.: Arlo, pt-BR"></label><label>Voz<select name="voice">${voices}</select></label><small id="voice-count" aria-live="polite">${config.gemini ? "Carregando biblioteca…" : "Vozes locais"}</small></div>
+        </div>
+      </details>
+      ${project?.urls?.audio ? `<div class="script-audio"><strong>Narração do projeto</strong><audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>${hosted ? `<a class="text-link" href="${html(project.urls.audio)}" download="narracao.wav">Baixar narração WAV</a>` : ""}</div>` : ""}
       ${!config.gemini ? '<p class="notice">Configure a chave Gemini no servidor para gerar a narração.</p>' : ""}
-      <small class="draft-status" role="status"></small><div class="actions">${embedded && hosted ? '<a class="button secondary" href="/#pacote" target="_top">Pacote de edição</a>' : ""}<button class="button secondary" name="intent" value="save">Salvar roteiro</button><button class="button secondary" name="intent" value="audio" ${!config.gemini || project?.publicacao ? "disabled" : ""}>Gerar só a narração</button><button class="button" name="intent" value="produce" ${!config.go || !config.gemini || !config.kit || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
-      ${!hosted && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}</div>
-    </form><aside class="surface production-preview"><div class="workspace-panel-title"><h2>Prévia</h2><span class="workspace-badge">${project?.urls?.mp4 || version(project) ? "Do projeto" : "Referência visual"}</span></div>
-      <div class="poster-stage">${version(project) || project?.urls?.mp4 ? `<video class="portrait" controls playsinline preload="metadata" src="${html(version(project) ? videoUrl(project, version(project)) : project.urls.mp4)}"></video>` : `<img class="portrait" src="/studio-concept.webp" alt="Ilustração de referência de um rolo compactador na estrada">`}</div>
-      <p>Formato vertical · 9:16</p></aside></div>${planView(project)}
+      <small class="draft-status" role="status"></small><div class="actions production-actions">
+        <button class="button" name="intent" value="audio" ${!config.gemini || project?.publicacao ? "disabled" : ""}>Gerar narração</button>
+        ${!hosted && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}
+        <button class="button secondary" name="intent" value="produce" ${!config.go || !config.gemini || !config.kit || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
+        <button class="button secondary" name="intent" value="save">Salvar roteiro</button>
+        ${embedded && hosted ? '<a class="text-link" href="/#pacote" target="_top">Pacote de edição</a>' : ""}
+      </div>
+    </form><aside class="surface production-preview create-preview">
+      <div class="workspace-panel-title"><h2>Prévia do projeto</h2><span class="workspace-badge">9:16</span></div>
+      ${version(project) || project?.urls?.mp4 ? `<div class="poster-stage cinema-stage"><video class="portrait" controls playsinline preload="metadata" src="${html(version(project) ? videoUrl(project, version(project)) : project.urls.mp4)}"></video></div>`
+      : `<div class="preview-awaiting"><span class="empty-mark" aria-hidden="true">▶</span><p>${project?.scenePlan ? "Confira o plano de cenas para gerar a prévia." : project?.audio ? "A narração está pronta. A prévia aparece depois que você gerar a animação." : "A prévia aparece depois que você gerar a animação deste projeto."}</p></div>
+        <details class="visual-reference"><summary>Ver referência visual</summary><img src="/studio-concept.webp" alt="Ilustração de referência de um rolo compactador" loading="lazy"></details>`}
+    </aside></div>${planView(project)}
     ${project?.htmlDocuments?.length ? `<details class="surface planning-card scene-plan"><summary>Versões do HTML do projeto</summary><ul class="idea-list">${[...project.htmlDocuments].reverse().map((version, index) =>
       `<li><a href="/api/criar/projetos/${encodeURIComponent(project.id)}/html/${encodeURIComponent(version.id)}" download>${index === 0 ? "Baixar HTML atual" : "Baixar versão anterior"} · ${html(new Date(version.createdAt).toLocaleString("pt-BR"))}</a></li>`
     ).join("")}</ul></details>` : ""}
@@ -319,8 +336,8 @@ function review(project) {
   return `<div class="review-tabs" role="group" aria-label="Painel de revisão"><button data-action="tab" data-id="preview" aria-pressed="${cache.mobileTab === "preview"}">Prévia</button><button data-action="tab" data-id="chat" aria-pressed="${cache.mobileTab === "chat"}">Chat</button></div>
   <div class="review-grid" data-tab="${html(cache.mobileTab)}"><section class="surface review-preview">
     <div class="workspace-panel-title"><h2>Prévia da animação</h2>${item ? `<label class="sr-only" for="review-version">Versão</label><select id="review-version" ${project.publicacao ? "disabled" : ""}>${versions}</select>` : '<span class="workspace-badge">Versão original</span>'}</div>
-    <div class="review-stage"><video class="portrait" id="review-video" controls playsinline preload="metadata" src="${html(media)}"></video></div>
-    ${item ? `<div class="scene-list" aria-label="Cenas">${item.scenes.map((scene, index) => `<button type="button" data-action="seek" data-id="${scene.inicio}"><span class="scene-frame" aria-hidden="true"></span><strong>Cena ${index + 1}</strong><span>${clock(scene.inicio)}</span></button>`).join("")}</div>` : '<div class="review-file-details"><span>Vídeo vertical</span><span>MP4 original</span></div>'}
+    <div class="review-stage cinema-stage"><video class="portrait" id="review-video" controls playsinline preload="metadata" src="${html(media)}"></video></div>
+    ${item ? `<div class="review-scenes"><div class="scene-heading"><h3>Cenas</h3><span id="active-scene-label"></span></div><div class="scene-list" aria-label="Cenas">${item.scenes.map((scene, index) => `<button type="button" data-action="seek" data-id="${scene.inicio}"><span class="scene-frame" aria-hidden="true"></span><strong>Cena ${index + 1}</strong><span>${clock(scene.inicio)}</span></button>`).join("")}</div></div>` : '<div class="review-file-details"><span>Vídeo vertical</span><span>MP4 original</span></div>'}
     ${project.versions?.length > 1 || project.urls.mp4 ? `<div class="review-actions">
       ${project.versions?.length > 1 ? link("comparar", "Comparar versões", project.id) : ""}
       ${project.urls.mp4 ? link("publicar", "Publicar no YouTube", project.id, "text-link") : ""}
@@ -378,7 +395,7 @@ function publicationLibrary() {
   const candidates = cache.projects.filter(p => !p.jobId && !p.publicacao && (p.urls?.mp4 || version(p)))
   const published = cache.projects.filter(p => p.publicacao)
   return `${heading("Publicação", "Escolha um vídeo que você já criou no Studio.")}
-    <section class="surface form publication-picker">
+    <div class="publication-layout"><section class="surface form publication-picker">
       <h2>Vídeo do projeto</h2>
       ${candidates.length ? `<form id="publication-picker" class="channel-picker">
         <label>Selecione o vídeo<select name="projectId" required><option value="">Selecione…</option>
@@ -386,8 +403,23 @@ function publicationLibrary() {
         </select></label><button class="button">Revisar publicação</button>
       </form>` : `<p>${hosted ? "A renderização na Vercel ainda está pendente. Os MP4 gerados no Studio local aparecem na biblioteca local." : "Gere uma prévia ou exporte um vídeo para começar."}</p>${link("projetos", "Abrir projetos")}`}
       ${embedded ? '<a class="text-link" href="/#vincular" target="_top">Vincular um Short já publicado</a>' : ""}
-    </section>
+    </section>${candidates.length ? '<div id="publication-selection" aria-live="polite"></div>' : ""}</div>
     ${published.length ? `<div class="section-heading"><h2>Publicações anteriores</h2></div>${projectCards(published)}` : ""}`
+}
+
+function updatePublicationPreview(id) {
+  const selected = cache.projects.find(project => project.id === id)
+  const target = document.querySelector("#publication-selection")
+  if (!selected || !target) {
+    if (target) target.replaceChildren()
+    return
+  }
+  const item = version(selected)
+  const media = selected.urls.mp4 || (item && videoUrl(selected, item))
+  const channel = channelProject(selected)
+  target.innerHTML = `<div class="surface publication-preview"><div class="workspace-panel-title"><h2>${html(selected.titulo)}</h2></div>
+    <div class="poster-stage cinema-stage"><video class="portrait" controls playsinline preload="metadata" src="${html(media)}"></video></div>
+    <div class="channel-row">${channel ? avatar(channel) : ""}<div><small>Canal de destino</small><h3>${html(channel?.title || "A definir na revisão")}</h3></div></div></div>`
 }
 
 function publish(project) {
@@ -449,8 +481,13 @@ function redraw(page, project, pending) {
       importedScript = undefined
     }
     sendToPanel("studio:fields", { title: form.elements.title.value, script: form.elements.script.value })
+    const next = [...form.querySelectorAll('button[name="intent"]')].find(button =>
+      !button.disabled && button.value === "animate") || form.querySelector('button[value="audio"]:not(:disabled)')
+    const canReview = project?.urls?.mp4 || version(project)
+    sendToPanel("studio:mobile-action", canReview ? { intent: "review", label: "Revisar vídeo" } :
+      next ? { intent: next.value, label: next.textContent.trim() } : null)
     loadVoiceLibrary(project)
-  }
+  } else sendToPanel("studio:mobile-action", null)
   for (const field of content.querySelectorAll(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
   if (workspace) bindReview()
   if (page === "comparar") bindCompare()
@@ -505,11 +542,14 @@ function bindReview() {
     const scenes = version(cache.current)?.scenes ?? []
     const index = Math.max(0, scenes.findLastIndex((scene) => scene.inicio <= video.currentTime))
     cache.time = video.currentTime
+    const activeSceneLabel = document.querySelector("#active-scene-label")
+    if (activeSceneLabel) activeSceneLabel.textContent = `Cena ${index + 1} de ${scenes.length}`
     const context = document.querySelector("#scene-context")
     if (context) context.textContent = `Cena ${index + 1} · ${clock(video.currentTime)}`
     document.querySelectorAll(".scene-list button").forEach((button, n) => button.setAttribute("aria-current", String(n === index)))
   }
   video.addEventListener("loadedmetadata", () => { if (cache.time < video.duration) video.currentTime = cache.time; sync() })
+  video.addEventListener("seeking", sync)
   video.addEventListener("timeupdate", sync)
   sync()
   const sceneList = document.querySelector(".scene-list")
@@ -848,6 +888,7 @@ document.addEventListener("click", (event) => {
 
 content.addEventListener("change", (event) => {
   const field = event.target
+  if (field.name === "projectId" && field.form?.id === "publication-picker") updatePublicationPreview(field.value)
   if (field.id === "archived-projects") { cache.showArchived = field.checked; navigate() }
   if (field.matches(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
   const project = cache.current
@@ -904,6 +945,13 @@ if (embedded) {
     const data = event.data.data
     if (event.data.type === "studio:navigate" && typeof data === "string" && location.hash !== "#" + data) {
       location.replace("#" + data)
+      return
+    }
+    if (event.data.type === "studio:submit-create") {
+      const form = document.querySelector("#create-form")
+      if (data === "review" && form && cache.current?.id) return go("revisao", cache.current.id)
+      const button = ["audio", "animate"].includes(data) && form?.querySelector(`button[value="${data}"]:not(:disabled)`)
+      if (button) form.requestSubmit(button)
       return
     }
     if (event.data.type !== "studio:script") return

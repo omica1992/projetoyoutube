@@ -911,9 +911,12 @@ const chatFiles = $("#chat-files")
 
 const currentChatChannel = () => getActiveChannelProfile()?.id || primaryChannelId
 const chatAvatar = () => currentChatChannel() === primaryChannelId ? getAvatar() : getActiveChannelProfile()?.logo
+const syncChatChannel = () => { $("#chat-channel-name").textContent = getActiveChannelProfile()?.title || "FatoNexo" }
+syncChatChannel()
 const chatInitials = () => getActiveChannelProfile()?.title?.trim().split(/\s+/).slice(0,2).map(word => word[0]).join("").toUpperCase() || "FN"
 
 window.addEventListener("studio:active-channel", () => {
+  syncChatChannel()
   activeChatId = null
   lastChatList = []
   $("#chat-active-title").textContent = "Nova conversa"
