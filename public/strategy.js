@@ -1,4 +1,5 @@
-import { openWorkspace, openStudioScript } from "./workspace.js"
+import { openWorkspace, openStudioScript, getActiveChannelProfile } from "./workspace.js"
+import { primaryChannelId } from "./chat-channel.js"
 
 const searchForm = document.querySelector("#youtube-search")
 const connection = document.querySelector("#youtube-connection")
@@ -9,7 +10,8 @@ const ideaForm = document.querySelector("#idea-form")
 const newIdea = document.querySelector("#btn-nova-pauta")
 const goalForm = document.querySelector("#goal-form")
 const status = document.querySelector("#search-status")
-const key = "studio:fatonexo:planejamento"
+const activeChannelId = () => getActiveChannelProfile()?.id || primaryChannelId
+const storageKey = () => activeChannelId() === primaryChannelId ? "studio:fatonexo:planejamento" : `studio:planejamento:${activeChannelId()}`
 const number = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 })
 const targets = {
   entry: { subs: 500, views: 3_000_000, uploads: 3 },
@@ -17,14 +19,22 @@ const targets = {
   ads2027: { subs: 1_000, views: 20_000_000 },
 }
 
-const board = JSON.parse(localStorage.getItem(key) || '{"references":[],"ideas":[],"goal":{}}')
+const emptyBoard = () => ({ references: [], ideas: [], goal: {} })
+let board = JSON.parse(localStorage.getItem(storageKey()) || JSON.stringify(emptyBoard()))
 let editingReference = null
 let editingIdea = null
 
 function save() {
-  localStorage.setItem(key, JSON.stringify(board))
+  localStorage.setItem(storageKey(), JSON.stringify(board))
   render()
 }
+
+window.addEventListener("studio:active-channel", () => {
+  board = JSON.parse(localStorage.getItem(storageKey()) || JSON.stringify(emptyBoard()))
+  editingReference = null
+  editingIdea = null
+  render()
+})
 
 function formData(form) {
   return Object.fromEntries([...new FormData(form)].map(([key, value]) => [key, value.trim()]))

@@ -344,6 +344,7 @@ panelRoutes.get(
     const q = typeof req.query.q === "string" ? req.query.q.trim() : ""
     const type = req.query.type === "channel" ? "channel" : "video"
     const channelFilter = typeof req.query.channelFilter === "string" ? req.query.channelFilter : "all"
+    const channelId = typeof req.query.channelId === "string" && req.query.channelId.trim() ? req.query.channelId.trim() : CHANNEL_ID
     const days = Number(req.query.days || 30)
     const order = ["relevance", "date", "viewCount"].includes(req.query.order) ? req.query.order : "relevance"
     if (!q || q.length > 160 || ![7, 30, 90].includes(days)) {
@@ -352,6 +353,7 @@ panelRoutes.get(
     const { source, results } = await unifiedSearch({ query: q, type, days, order })
     const filtered = filterChannelsByGoal(results.filter((r) => r.id !== CHANNEL_ID), type, channelFilter)
     const saved = await saveBusca({
+      channelId,
       modo: "direta",
       objetivo: q,
       tipo: type,
@@ -434,7 +436,9 @@ panelRoutes.post(
       avaliacao,
       results: merged.slice(0, 24),
     }
+    const channelId = typeof req.body?.channelId === "string" && req.body.channelId.trim() ? req.body.channelId.trim() : CHANNEL_ID
     const saved = await saveBusca({
+      channelId,
       modo: "ia",
       objetivo,
       tipo,
@@ -502,7 +506,8 @@ panelRoutes.post(
         adaptacao_fatonexo: null,
       }
     }
-    const saved = await saveAnalise({ video, analise, model: ai.model })
+    const channelId = typeof req.body?.channelId === "string" && req.body.channelId.trim() ? req.body.channelId.trim() : CHANNEL_ID
+    const saved = await saveAnalise({ channelId, video, analise, model: ai.model })
     res.json({ video, analise, model: ai.model, analiseId: saved.id })
   }),
 )

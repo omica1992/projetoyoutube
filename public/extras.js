@@ -1,6 +1,10 @@
 import { $, el, apiJson, toast, numFmt, extLink, renderMarkdown } from "./ui.js"
+import { primaryChannelId } from "./chat-channel.js"
+import { getActiveChannelProfile } from "./workspace.js"
 
 const modelVal = () => $("#global-model")?.value || ""
+const activeChannelId = () => getActiveChannelProfile()?.id || primaryChannelId
+const isPrimaryChannel = () => activeChannelId() === primaryChannelId
 
 /* ==================== 1. RADAR DE CONCORRENTES (#pesquisa) ==================== */
 let radarLoaded = false
@@ -9,6 +13,12 @@ async function loadRadar(fetchVideos = true) {
   const box = $("#radar-lista")
   const chips = $("#radar-canais")
   if (!box || !chips) return
+  if (!isPrimaryChannel()) {
+    chips.replaceChildren()
+    box.replaceChildren(el("p", "Nenhum concorrente monitorado para este canal ainda.", "meta"))
+    radarLoaded = true
+    return
+  }
   if (fetchVideos) box.replaceChildren(el("p", "Consultando Shorts recentes dos concorrentes…", "meta"))
   try {
     const data = await apiJson(`/api/painel/concorrentes${fetchVideos ? "?radar=1" : ""}`)
@@ -199,6 +209,11 @@ let padroesLoaded = false
 async function loadPadroes(ai = false) {
   const out = $("#padroes-out")
   if (!out) return
+  if (!isPrimaryChannel()) {
+    out.replaceChildren(el("p", "Sem dados de comparação de Shorts para este canal ainda.", "meta"))
+    padroesLoaded = true
+    return
+  }
   out.replaceChildren(el("p", ai ? "Comparando Shorts e gerando regras com IA…" : "Comparando Top 5 vs. Piores 5…", "meta"))
   try {
     const res = await apiJson(`/api/painel/canal/padroes${ai ? "?ai=1" : ""}`)
@@ -223,7 +238,9 @@ let funilLoaded = false
 
 function readIdeasLocal() {
   try {
-    const raw = JSON.parse(localStorage.getItem("studio:fatonexo:planejamento") || "{}")
+    const ch = activeChannelId()
+    const key = ch === primaryChannelId ? "studio:fatonexo:planejamento" : `studio:planejamento:${ch}`
+    const raw = JSON.parse(localStorage.getItem(key) || "{}")
     return Array.isArray(raw.ideas) ? raw.ideas : []
   } catch {
     return []
@@ -235,7 +252,8 @@ async function loadFunil() {
   if (!box) return
   box.replaceChildren(el("p", "Carregando funil…", "meta"))
   try {
-    const data = await apiJson("/api/painel/funil")
+    const primary = isPrimaryChannel()
+    const data = primary ? await apiJson("/api/painel/funil") : { counts: { roteiros: 0, prontos: 0, shortsNoCanal: 0, publicadosVinculados: 0 }, source: "canal" }
     const ideas = readIdeasLocal()
     const stages = [
       { label: "1. Pautas", count: ideas.length, sub: `${ideas.filter((i) => i.status === "Prioridade").length} prioridade(s)` },
@@ -256,7 +274,7 @@ async function loadFunil() {
     const actions = el("div")
     actions.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px"
     actions.append(
-      extLink("Abrir YouTube Studio (Upload)", "https://studio.youtube.com/channel/UCClrO3uvc5-H6NPc6alEHDw/videos/upload"),
+      extLink("Abrir YouTube Studio (Upload)", `https://studio.youtube.com/channel/${encodeURIComponent(activeChannelId())}/videos/upload`),
       el("span", `Fonte: ${data.source === "youtube-api-v3" ? "YouTube Data API v3 (oficial)" : "Leitura pública"} · Upload direto exige OAuth 2.0`, "meta"),
     )
     box.replaceChildren(grid, actions)
@@ -350,6 +368,11 @@ $("#btn-oauth-disconnect")?.addEventListener("click", async () => {
 async function loadAnalytics() {
   const out = $("#analytics-out")
   if (!out) return
+  if (!isPrimaryChannel()) {
+    out.replaceChildren(el("p", "Sem dados do YouTube Analytics para este canal ainda.", "meta"))
+    analyticsLoaded = true
+    return
+  }
   out.replaceChildren(el("p", "Consultando YouTube Analytics API (28 dias)…", "meta"))
   try {
     const res = await apiJson("/api/painel/youtube/analytics")
@@ -383,6 +406,11 @@ let agendaLoaded = false
 async function loadAgenda() {
   const box = $("#agenda-list")
   if (!box) return
+  if (!isPrimaryChannel()) {
+    box.replaceChildren(el("p", "Nenhuma ação agendada para este canal.", "meta"))
+    agendaLoaded = true
+    return
+  }
   try {
     const res = await apiJson("/api/painel/agenda")
     const list = res.agenda || []
@@ -491,6 +519,17 @@ function onWorkspace(id) {
   }
   if (id === "integracoes" && !oauthLoaded) loadOAuthCard()
 }
+window.addEventListener("studio:active-channel", () => {
+  radarLoaded = false
+  funilLoaded = false
+  agendaLoaded = false
+  analyticsLoaded = false
+  padroesLoaded = false
+  for (const id of ["#radar-lista", "#radar-canais", "#padroes-out", "#funil-body", "#analytics-out", "#agenda-list"]) {
+    $(id)?.replaceChildren()
+  }
+  onWorkspace(document.body.dataset.workspace || "canal")
+})
 window.addEventListener("workspace:change", (e) => onWorkspace(e.detail?.id))
 const initialProductionTab = { "#pacote": "prod-pacote", "#vincular": "prod-vincular" }[location.hash]
 if (initialProductionTab) document.querySelector(`[data-subtarget="${initialProductionTab}"]:not(.active)`)?.click()

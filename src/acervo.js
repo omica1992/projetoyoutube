@@ -127,7 +127,7 @@ export async function saveAnalise(entry) {
   }
   const data = readLocal()
   const videoId = entry.video?.id
-  const filtered = videoId ? data.analises.filter((a) => a.video?.id !== videoId) : data.analises
+  const filtered = videoId ? data.analises.filter((a) => a.video?.id !== videoId || (a.channelId || "") !== (entry.channelId || "")) : data.analises
   data.analises = [item, ...filtered].slice(0, 80)
   writeLocal(data)
   return item

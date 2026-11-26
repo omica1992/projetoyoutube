@@ -1,4 +1,6 @@
 import { $, el, apiJson, toast, numFmt, renderMarkdown } from "./ui.js"
+import { primaryChannelId } from "./chat-channel.js"
+import { getActiveChannelProfile } from "./workspace.js"
 
 const body = $("#horarios-body")
 let loaded = false
@@ -94,6 +96,11 @@ function render(data) {
 
 async function load(ai = false) {
   if (loading) return
+  if ((getActiveChannelProfile()?.id || primaryChannelId) !== primaryChannelId) {
+    body.replaceChildren(el("p", "Sem dados de horários publicados para este canal ainda.", "meta"))
+    loaded = true
+    return
+  }
   loading = true
   body.replaceChildren(el("p", ai ? "Analisando horários e consultando a IA…" : "Analisando horários…", "meta"))
   try {
@@ -106,6 +113,12 @@ async function load(ai = false) {
     loading = false
   }
 }
+
+window.addEventListener("studio:active-channel", () => {
+  loaded = false
+  body?.replaceChildren()
+  if (document.body.dataset.workspace === "estrategia" && !$("#horarios-card")?.closest("[hidden]")) load(false)
+})
 
 $("#btn-horarios")?.addEventListener("click", () => load(false))
 $("#btn-horarios-ai")?.addEventListener("click", () => load(true))

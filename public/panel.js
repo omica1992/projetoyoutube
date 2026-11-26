@@ -304,7 +304,7 @@ async function runAiSearch(customQuery) {
   searchStatus.textContent = "A IA está montando as buscas e analisando o potencial viral…"
   aiBriefCard.hidden = true
   try {
-    const data = await jsonPost("/api/painel/direcionador/buscar", { objetivo, tipo: type, channelFilter, days: Number(days), model: currentModel() })
+    const data = await jsonPost("/api/painel/direcionador/buscar", { objetivo, tipo: type, channelFilter, days: Number(days), model: currentModel(), channelId: currentChatChannel() })
     $("#ai-brief-model").textContent = data.model
     $("#ai-brief-summary").textContent = data.avaliacao?.resumo || data.criterio || ""
     $("#ai-brief-queries").textContent = `Buscas executadas: ${(data.queries || []).join(" · ")}`
@@ -349,7 +349,9 @@ $("#btn-direct-search").addEventListener("click", async () => {
   searchStatus.textContent = "Buscando direto no YouTube…"
   aiBriefCard.hidden = true
   try {
-    const data = await apiJson(`/api/painel/pesquisa?${new URLSearchParams(formData(searchForm))}`)
+    const params = new URLSearchParams(formData(searchForm))
+    params.set("channelId", currentChatChannel())
+    const data = await apiJson(`/api/painel/pesquisa?${params}`)
     searchStatus.textContent = `${data.results.length} resultados · ${data.source === "youtube-api" ? "YouTube API" : "YouTube público"} · salvos no Histórico`
     renderSearchResults(data.results || [])
     loadAcervo()
@@ -425,7 +427,7 @@ async function analyzeVideo(urlOrId, manual = "") {
   $("#analysis-loading").hidden = false
   $("#analysis-status").textContent = "Lendo o vídeo e analisando o roteiro com o Direcionador… (pode levar até 30 s)"
   try {
-    const data = await jsonPost("/api/painel/video/analisar", { urlOrId, transcricaoManual: manual, model: currentModel() })
+    const data = await jsonPost("/api/painel/video/analisar", { urlOrId, transcricaoManual: manual, model: currentModel(), channelId: currentChatChannel() })
     showAnalysis(data)
     loadAcervo()
   } catch (error) {
@@ -774,8 +776,10 @@ $("#btn-narration").addEventListener("click", async () => {
 
 /* ============================== Metas YPP ============================== */
 
+const currentChatChannel = () => getActiveChannelProfile()?.id || primaryChannelId
 const yppInput = $("#ypp-views-input")
-yppInput.value = localStorage.getItem(YPP_VIEWS_KEY) || ""
+const yppViewsKey = () => currentChatChannel() === primaryChannelId ? YPP_VIEWS_KEY : `${YPP_VIEWS_KEY}:${currentChatChannel()}`
+yppInput.value = localStorage.getItem(yppViewsKey()) || ""
 
 function meter(label, current, target) {
   const val = Number.isFinite(current) ? current : 0
@@ -793,15 +797,17 @@ function meter(label, current, target) {
 }
 
 function renderYpp() {
-  const snap = getSnapshot()
+  const isPrimary = currentChatChannel() === primaryChannelId
+  const snap = isPrimary ? getSnapshot() : null
   const cur = snap?.current
-  const subs = cur?.subs ?? 0
-  const stored = Number(localStorage.getItem(YPP_VIEWS_KEY) || "")
-  const tracked = cur?.views ?? 0
+  const profile = getActiveChannelProfile()
+  const subs = isPrimary ? (cur?.subs ?? 0) : (Number.isFinite(profile?.subscribers) ? profile.subscribers : 0)
+  const stored = Number(localStorage.getItem(yppViewsKey()) || "")
+  const tracked = isPrimary ? (cur?.views ?? 0) : 0
   const views = Number.isFinite(stored) && stored > 0 ? stored : tracked
   const since = Date.now() - 90 * 86_400_000
-  const dated = (snap?.shorts || []).filter((s) => s.date && Date.parse(s.date) >= since).length
-  const uploads = dated || cur?.videos || 0
+  const dated = isPrimary ? (snap?.shorts || []).filter((s) => s.date && Date.parse(s.date) >= since).length : 0
+  const uploads = isPrimary ? (dated || cur?.videos || 0) : 0
   const tiers = [
     { title: "Entrada no YPP · fãs e recursos", hit: subs >= 500 && views >= 3_000_000 && uploads >= 3, meters: [["Inscritos", subs, 500], ["Views Shorts · 90 dias", views, 3_000_000], ["Envios válidos · 90 dias", uploads, 3]] },
     { title: "Monetização com anúncios", hit: subs >= 1000 && views >= 10_000_000, meters: [["Inscritos", subs, 1000], ["Views Shorts · 90 dias", views, 10_000_000]] },
@@ -828,7 +834,7 @@ $("#ypp-views-form").addEventListener("submit", (e) => {
   e.preventDefault()
   const v = Number(yppInput.value)
   if (!Number.isFinite(v) || v < 0) return
-  localStorage.setItem(YPP_VIEWS_KEY, String(Math.round(v)))
+  localStorage.setItem(yppViewsKey(), String(Math.round(v)))
   renderYpp()
   toast("Views dos 90 dias atualizadas")
 })
@@ -841,10 +847,12 @@ $("#btn-ypp-plan").addEventListener("click", async () => {
   box.hidden = false
   box.replaceChildren(skeleton(3))
   try {
-    const cur = getSnapshot()?.current
-    const views = Number(localStorage.getItem(YPP_VIEWS_KEY) || "") || cur?.views || 0
+    const isPrimary = currentChatChannel() === primaryChannelId
+    const cur = isPrimary ? getSnapshot()?.current : null
+    const subs = isPrimary ? (cur?.subs ?? 0) : (getActiveChannelProfile()?.subscribers ?? 0)
+    const views = Number(localStorage.getItem(yppViewsKey()) || "") || (isPrimary ? cur?.views : 0) || 0
     const data = await jsonPost("/api/painel/direcionador/perguntar", {
-      pergunta: `Hoje tenho ${cur?.subs ?? 25} inscritos e ${views} views nos Shorts. Monte um plano prático de 3 passos para bater a primeira meta de monetização do YouTube (500 inscritos e 3M de views em 90 dias).`,
+      pergunta: `Hoje tenho ${subs} inscritos e ${views} views nos Shorts. Monte um plano prático de 3 passos para bater a primeira meta de monetização do YouTube (500 inscritos e 3M de views em 90 dias).`,
       model: currentModel(),
     })
     box.replaceChildren(renderMarkdown(data.resposta))
@@ -909,7 +917,6 @@ window.addEventListener("workspace:change", (event) => {
 if (location.hash === "#chat") loadChatProjects()
 const chatFiles = $("#chat-files")
 
-const currentChatChannel = () => getActiveChannelProfile()?.id || primaryChannelId
 const chatAvatar = () => currentChatChannel() === primaryChannelId ? getAvatar() : getActiveChannelProfile()?.logo
 const syncChatChannel = () => { $("#chat-channel-name").textContent = getActiveChannelProfile()?.title || "FatoNexo" }
 syncChatChannel()
@@ -920,8 +927,20 @@ window.addEventListener("studio:active-channel", () => {
   activeChatId = null
   lastChatList = []
   $("#chat-active-title").textContent = "Nova conversa"
+  yppInput.value = localStorage.getItem(yppViewsKey()) || ""
+  renderYpp()
+  const yppBox = $("#ypp-plan-box")
+  if (yppBox) { yppBox.hidden = true; yppBox.replaceChildren() }
+  if ($("#report-status")) $("#report-status").textContent = "Exporte no YouTube Studio → Analytics → Modo avançado → Exportar CSV."
+  $("#performance-top")?.replaceChildren()
+  $("#performance-worst")?.replaceChildren()
+  $("#search-results")?.replaceChildren()
+  if ($("#search-status")) $("#search-status").textContent = ""
+  if (aiBriefCard) aiBriefCard.hidden = true
+  closeDrawers()
   renderChatSidebar()
   renderChat([])
+  loadAcervo({ chat: true })
 })
 
 function aiAvatar() {
@@ -1334,9 +1353,11 @@ function showSavedAnalysis(item) {
 async function loadAcervo({ chat = false } = {}) {
   try {
     const data = await apiJson("/api/painel/acervo")
-    const buscas = data.buscas || []
-    const analises = data.analises || []
-    const roteiros = data.roteiros || []
+    const ch = currentChatChannel()
+    const ofChannel = (arr) => (arr || []).filter((item) => (item.channelId || primaryChannelId) === ch)
+    const buscas = ofChannel(data.buscas)
+    const analises = ofChannel(data.analises)
+    const roteiros = ofChannel(data.roteiros)
     allChats = data.chats || []
     const showArch = $("#history-show-archived")?.checked
     const vis = (arr) => arr.filter((x) => showArch || !x.archived)
