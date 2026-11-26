@@ -401,6 +401,7 @@ function redraw(page, project, pending) {
   }
   content.innerHTML = (pages[page] || home)()
   content.setAttribute("aria-busy", "false")
+  if (embedded) for (const oauthLink of content.querySelectorAll('a[href^="/api/youtube/oauth/start"]')) oauthLink.target = "_top"
   if (hosted && page === "canais") content.insertAdjacentHTML("beforeend", '<div class="actions"><a class="button" href="/#integracoes" target="_top">Integração com o YouTube</a></div>')
   if (page === "criar") {
     restoreDraft(project)
@@ -868,8 +869,9 @@ if (embedded) {
     }
     if (event.data.type !== "studio:script") return
     if (!data || typeof data !== "object") return
-    importedScript = data.id ? undefined : data
-    go("criar", typeof data.id === "string" ? data.id : undefined)
+    const openSaved = typeof data.id === "string" && (hosted || data.id.startsWith("fdn-"))
+    importedScript = openSaved ? undefined : data
+    go("criar", openSaved ? data.id : undefined)
     sendToPanel("studio:received")
   })
   window.addEventListener("hashchange", () => sendToPanel("studio:route", location.hash.slice(1)))

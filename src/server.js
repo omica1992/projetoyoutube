@@ -45,7 +45,15 @@ if (!process.env.VERCEL) {
     }
     next()
   })
-  app.get(["/", "/index.html", "/criar.html", "/studio.html", "/editor.html"], (_req, res) => {
+  app.get(["/", "/index.html", "/criar.html", "/studio.html", "/editor.html"], (req, res, next) => {
+    const proxy = studioRequestOrigin(req)?.startsWith("https:")
+    if (!proxy && ["/", "/index.html", "/criar.html"].includes(req.path)) {
+      res.set("Cache-Control", "no-store")
+      return next()
+    }
+    if (!proxy && req.path === "/studio.html") {
+      return res.set("Cache-Control", "no-store").sendFile(path.join(PUBLIC_DIR, "criar.html"))
+    }
     const assets = ["studio-ui.js", "studio-ui.css", "studio-kit-preview.jpg"]
     const revision = assets.map((file) => fs.statSync(path.join(PUBLIC_DIR, file)).mtime.getTime().toString(36)).join("-")
     const document = fs.readFileSync(path.join(PUBLIC_DIR, "studio.html"), "utf8")

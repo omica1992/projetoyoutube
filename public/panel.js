@@ -621,7 +621,7 @@ $("#btn-new-script").addEventListener("click", () => {
 })
 
 function loadSavedScript(entry) {
-  if (entry.id) openStudioScript({ id: entry.id })
+  if (entry.id) openStudioScript({ id: entry.id, title: entry.roteiro?.titulo || entry.pauta, script: toText(entry.roteiro?.roteiro) })
   currentRoteiroId = entry.id || null
   const r = entry.roteiro || {}
   $("#pauta").value = entry.pauta || r.titulo || ""
@@ -1031,7 +1031,7 @@ function renderChat(messages, { typing = false, animateId = null } = {}) {
       toScript.type = "button"
       toScript.append(icon("pen"), el("span", "Usar no roteiro"))
       toScript.addEventListener("click", () => {
-        if (m.panelAction?.savedDraft?.id) return openStudioScript({ id: m.panelAction.savedDraft.id })
+        if (m.panelAction?.savedDraft?.id) return loadSavedScript(m.panelAction.savedDraft)
         let script = m.text.trim()
         if (/<(?:!doctype|html|body|main|section)\b/i.test(script)) {
           const template = document.createElement("template")

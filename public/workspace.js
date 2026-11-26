@@ -31,7 +31,15 @@ function renderWorkspace(hash, fromEditor = false) {
     document.querySelector(`[data-subtarget="${tab}"]:not(.active)`)?.click()
     if (inEditor && !fromEditor && editorRoute !== destination) {
       editorRoute = destination
-      if (!editor.hasAttribute("src")) editor.src = editor.dataset.src.split("#")[0] + "#" + destination
+      if (!editor.hasAttribute("src")) {
+        const url = new URL(editor.dataset.src, location.origin)
+        const currentQuery = new URLSearchParams(location.search)
+        for (const key of ["oauth", "msg"]) {
+          if (currentQuery.has(key)) url.searchParams.set(key, currentQuery.get(key))
+        }
+        url.hash = destination
+        editor.src = url.href
+      }
       else editor.contentWindow.postMessage({ type: "studio:navigate", data: destination }, location.origin)
     }
   }
