@@ -59,6 +59,11 @@ function headerView(project = null) {
   const download = project?.urls.mp4
     ? `<a class="button workspace-export" href="${html(project.urls.mp4)}" download><span aria-hidden="true">↓</span> Baixar MP4</a>`
     : project ? link("exportar", "Exportar vídeo", project.id, "button workspace-export") : ""
+  if (embedded) {
+    header.hidden = !project
+    header.innerHTML = project ? `<div class="header-inner"><h1 class="workspace-title">${html(project.titulo)}</h1>${download}</div>` : ""
+    return
+  }
   header.innerHTML = `<div class="header-inner">
     <details class="switcher"><summary>${brand}<span>${html(channel?.title || "Studio 3D")}</span><span aria-hidden="true">⌄</span></summary>
       <div class="menu" role="menu">${items}${items ? '<button type="button" role="menuitem" data-action="channel" data-id="">Projetos sem canal</button>' : ""}${review ? '<a role="menuitem" href="#inicio">Início</a><a role="menuitem" href="#projetos">Projetos</a>' : ""}<a role="menuitem" href="#canais">Meus canais</a></div></details>
@@ -832,13 +837,19 @@ if (embedded) {
   resize.observe(content)
   resize.observe(header)
   window.addEventListener("message", (event) => {
-    if (event.origin !== location.origin || event.source !== window.parent || event.data?.type !== "studio:script") return
+    if (event.origin !== location.origin || event.source !== window.parent) return
     const data = event.data.data
+    if (event.data.type === "studio:navigate" && typeof data === "string" && location.hash !== "#" + data) {
+      location.replace("#" + data)
+      return
+    }
+    if (event.data.type !== "studio:script") return
     if (!data || typeof data !== "object") return
     importedScript = data.id ? undefined : data
     go("criar", typeof data.id === "string" ? data.id : undefined)
     sendToPanel("studio:received")
   })
+  window.addEventListener("hashchange", () => sendToPanel("studio:route", location.hash.slice(1)))
   sendToPanel("studio:ready")
 }
 window.addEventListener("hashchange", navigate)

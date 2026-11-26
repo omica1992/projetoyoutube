@@ -434,3 +434,14 @@ option { color:var(--ink); background:var(--well); }
 @media (max-width:760px) {
   .embedded-studio .header nav { position:static; box-shadow:none; }
 }
+.embedded-studio {
+  --paper:#061b19; --ink:#edf4f0; --muted:#a2bcb5; --line:#2a4741; --blue:#f2b53f;
+  --panel:#102d28; --well:#081f1d; background:transparent;
+}
+.embedded-studio body { background:transparent; }
+.embedded-studio .shell { width:100%; padding:0 0 1rem; }
+.embedded-studio .page-heading h1,.embedded-studio .library-toolbar h1 { font-family:inherit; font-weight:750; font-size:clamp(1.45rem,4vw,2.25rem); }
+.embedded-studio .surface { background:linear-gradient(145deg,#12322d,#0a211d 72%); }
+.embedded-studio .review-stage,.embedded-studio .poster-stage { border-color:var(--line); background:#071a18; }
+.embedded-studio .workspace-header .header-inner { display:flex; justify-content:space-between; }
+.embedded-studio .workspace-title { border:0; padding:0; }
