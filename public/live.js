@@ -344,6 +344,7 @@ function renderHero() {
   const avatarUrl = normAvatar(ch?.avatar)
   if (avatarUrl) {
     for (const [img, fb] of [["#channel-hero-avatar", "#hero-fallback"], ["#brand-avatar", "#brand-fallback"]]) {
+      if (img === "#brand-avatar" && document.querySelector("#canal")?.classList.contains("alternate-channel")) continue
       const i = $(img), f = $(fb)
       if (!i || !f) continue
       i.referrerPolicy = "no-referrer"
@@ -356,6 +357,8 @@ function renderHero() {
   if (ch?.title) $("#hero-title").textContent = ch.title
   if (ch?.handle) $("#hero-handle").textContent = ch.handle
 }
+
+window.addEventListener("studio:reset-brand", () => { if (snap?.channel) renderHero() })
 
 function renderInsight() {
   const box = $("#channel-ai-pulse")

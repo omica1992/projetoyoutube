@@ -9,7 +9,7 @@ import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 import { buildHorarios } from "./horarios.js"
-import { ytGetVideoComments, ytGetVideosByIds } from "./youtube.js"
+import { ytGetVideoComments, ytGetVideosByIds, ytResolveChannel } from "./youtube.js"
 import { getAnalyticsSummary, getOAuthStatus, uploadShortToYouTube } from "./youtube-oauth.js"
 import {
   addAgendaItem,
@@ -218,7 +218,23 @@ panelRoutes.get("/studio/config", route(async (_req,res) => {
   res.json({ models:Object.keys(catalog),modelCatalog:catalog,voices:[ARLO,...VOICE_CATALOG],go:Boolean(go),gemini:Boolean(gemini),kit:false,cloud:true })
 }))
 panelRoutes.get("/studio/vozes", route(async (_req,res) => res.json((await googleVoices(await providerKey("gemini"))).filter(v=>!/^voice(?:key)?_/.test(v.id)))))
-panelRoutes.get("/studio/pautas", route(async (_req,res) => res.json(await cloudBook())))
+panelRoutes.get("/studio/perfil-canal", route(async (req, res) => {
+  let ref = String(req.query.canal || "").trim().slice(0, 300)
+  if (/^https?:\/\//i.test(ref)) {
+    const url = new URL(ref)
+    if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) return res.status(400).json({ error: "Use um link de canal do YouTube." })
+    ref = /^\/(?:channel\/)?(@[^/]+|UC[\w-]{22})(?:\/|$)/.exec(url.pathname)?.[1] || ""
+    ref = decodeURIComponent(ref)
+  }
+  const byId = /^UC[\w-]{22}$/.test(ref)
+  if (!byId && !/^@[\p{L}\p{N}_.-]{2,60}$/u.test(ref)) return res.status(400).json({ error: "Informe o @handle, o ID ou o link do canal." })
+  const channel = await ytResolveChannel(ref).catch(() => null)
+  if (channel) return res.json(channel)
+  const overview = await getChannelPublicOverview(ref, byId ? ref : "")
+  if (!overview.channelId) return res.status(404).json({ error: "Canal não encontrado no YouTube." })
+  res.json({ id: overview.channelId, title: overview.title, handle: overview.handle, logo: overview.avatar, banner: overview.banner })
+}))
+panelRoutes.get("/studio/pautas", route(async (req,res) => res.json(await cloudBook(req.query.canal))))
 panelRoutes.get("/studio/render-status", route(async (_req, res) => {
   const kitStored = await loadCloudKit().then(() => true, () => false)
   res.json({ kitStored, renderEnabled: false })
@@ -504,6 +520,7 @@ panelRoutes.post(
     const saved = await saveRoteiro({
       id: typeof req.body?.id === "string" ? req.body.id : undefined,
       status: "validado",
+      channelId: /^UC[\w-]{22}$/.test(req.body.channelId || "") ? req.body.channelId : undefined,
       pautaId: typeof req.body?.pautaId === "string" ? req.body.pautaId.slice(0,80) : undefined,
       pauta,
       duracao: Number(req.body?.duracao) || 45,
@@ -526,6 +543,7 @@ panelRoutes.post(
     const saved = await saveRoteiro({
       id: typeof req.body?.id === "string" && req.body.id ? req.body.id : undefined,
       status: "rascunho",
+      channelId: /^UC[\w-]{22}$/.test(req.body.channelId || "") ? req.body.channelId : undefined,
       pautaId: typeof req.body?.pautaId === "string" ? req.body.pautaId.slice(0,80) : undefined,
       pauta: pauta || "Rascunho sem título",
       duracao: Number(req.body?.duracao) || 45,

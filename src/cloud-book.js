@@ -3,16 +3,17 @@ import { randomUUID } from "node:crypto"
 import { suggestIdeas } from "./studio-planning.js"
 import { validGoModel } from "./studio-go.js"
 
-const key = "studio:cloud:pautas"
-export const cloudBook = async () => (await kvGet(key)) || { references: [], ideas: [], interests: "" }
+const bookKey = channelId => /^UC[\w-]{22}$/.test(channelId || "") && channelId !== "UCClrO3uvc5-H6NPc6alEHDw" ? "studio:cloud:pautas:" + channelId : "studio:cloud:pautas"
+export const cloudBook = async channelId => (await kvGet(bookKey(channelId))) || { references: [], ideas: [], interests: "" }
 
 export async function editCloudBook(body) {
+  const key = bookKey(body.channelId)
   const interests = String(body.interests || "").trim().slice(0,1000)
   let ideas
   if (body.action === "sugerir") {
     if (!validGoModel(body.model)) throw Error("Selecione um modelo OpenCode Go.")
-    const book = await cloudBook()
-    ideas = await suggestIdeas(body.model, interests, book.references, book.ideas.map(i=>i.title), "FatoNexo")
+    const book = await cloudBook(body.channelId)
+    ideas = await suggestIdeas(body.model, interests, book.references, book.ideas.map(i=>i.title), String(body.channelTitle || "FatoNexo").slice(0,100))
   }
   for (let attempt=0; attempt<5; attempt++) {
     const rows = await sbSelect("fatonexo_kv","select=value,updated_at&key=eq."+encodeURIComponent(key))

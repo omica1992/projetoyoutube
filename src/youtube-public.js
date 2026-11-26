@@ -437,6 +437,8 @@ export async function getChannelPublicOverview(channelRef = "@fatonexocuri", cha
     handle,
     title: meta.title || handle || "Canal",
     avatar: pickThumb(meta.avatar),
+    banner: pickThumb(data.header?.pageHeaderRenderer?.content?.pageHeaderViewModel?.banner?.imageBannerViewModel?.image?.sources
+      || data.header?.c4TabbedHeaderRenderer?.banner?.thumbnails),
     subscribers: parseCompactNumber(subsText),
     subscribersText: subsText,
     videosCount: parseCompactNumber(videosText),

@@ -44,9 +44,11 @@ function notify(message, error = false) {
   status.classList.toggle("error", error)
 }
 
+const youtubeImage = url => /^https:\/\/(?:[\w.-]+\.googleusercontent\.com|yt3\.ggpht\.com)\//i.test(url || "") ? url : ""
+
 function avatar(channel, classes = "") {
   const mark = html((channel?.title ?? "Studio 3D").trim()[0])
-  const logo = channel?.logo && /^https:\/\/(?:[\w.-]+\.googleusercontent\.com|yt3\.ggpht\.com)\//i.test(channel.logo) ? channel.logo : ""
+  const logo = youtubeImage(channel?.logo)
   return logo ? `<img class="avatar ${classes}" src="${html(logo)}" alt="" referrerpolicy="no-referrer">` : `<span aria-hidden="true" class="avatar ${classes}">${mark}</span>`
 }
 
@@ -179,7 +181,7 @@ function home() {
   const latest = cache.projects.find(p => !p.publicacao) || cache.projects[0]
   const recent = cache.projects.filter(p => p.id !== latest?.id).slice(0, 3)
   return `<section class="channel-hero surface">
-    <img class="hero-scene" src="/studio-banner.webp" alt="">
+    ${youtubeImage(channel?.banner) ? `<img class="hero-scene channel-cover" src="${html(channel.banner)}" alt="" referrerpolicy="no-referrer">` : !channel ? '<img class="hero-scene" src="/studio-banner.webp" alt="">' : ""}
     <div class="hero-identity">${channel ? avatar(channel, "large") : '<span class="studio-mark hero-mark" aria-hidden="true"><span></span></span>'}<div><p>${channel ? "Studio 3D" : "Estúdio de vídeo"}</p><h1>${html(channel?.title || "Studio 3D")}</h1></div></div>
     ${link("criar", "<span aria-hidden='true'>＋</span> Novo vídeo", "", "button")}</section>
 
@@ -196,7 +198,7 @@ function channels() {
   return `${heading("Meus canais", "Alterne entre seus canais do YouTube.", rows && cache.youtubeConfigured ? '<a class="button" href="/api/youtube/oauth/start?canais=1">Conectar canal</a>' : "")}
     <section class="surface channel-list">${rows || `<div class="studio-empty"><span class="empty-mark" aria-hidden="true">▶</span><h2>Nenhum canal conectado</h2>
       <p>${cache.youtubeConfigured ? "Entre com sua conta Google e confirme o canal que quer adicionar." : "Configure as credenciais OAuth do Google no servidor do Studio."}</p>
-      ${cache.youtubeConfigured ? '<a class="button" href="/api/youtube/oauth/start?canais=1">Conectar canal</a>' : ""}</div>`}</section>`
+      ${cache.youtubeConfigured ? '<a class="button" href="/api/youtube/oauth/start?canais=1">Conectar canal</a>' : ""}</div>`}</section>${hosted ? `<form id="channel-profile-form" class="surface form"><label>Adicionar perfil do YouTube<input name="ref" required maxlength="300" placeholder="@canal ou link do YouTube"></label><div class="actions"><button class="button">Adicionar e abrir canal</button></div></form>` : ""}`
 }
 
 function connect(channel, id) {
@@ -443,6 +445,7 @@ async function navigate() {
     if (["pautas","inicio"].includes(page)) cache.book = await api("/pautas?canal="+encodeURIComponent(cache.activeId))
     if (request !== navigation) return
     cache.current = project
+    sendToPanel("studio:channel", activeChannel())
     if (["revisao", "comparar", "exportar", "publicar"].includes(page) && !project) { location.hash = "projetos"; return }
     redraw(page, project, pending)
     if (project?.jobId && !cache.busy) resume(project)
@@ -632,12 +635,17 @@ content.addEventListener("submit", (event) => {
   const form = event.target
   const data = Object.fromEntries(new FormData(form))
   const project = cache.current
+  if (form.id === "channel-profile-form") action(async () => {
+    const profile = await api("/perfil-canal", { ref: data.ref.trim() })
+    localStorage.setItem("studio-channel", profile.id)
+    go("inicio")
+  })
   if (form.id === "ideas-form" || form.id === "reference-form") {
     const operation = form.id === "reference-form" ? "referencia" : event.submitter?.value || "sugerir"
     const channelId = cache.activeId
     action(async () => {
       if (data.scriptModel) localStorage.setItem("scriptModel", data.scriptModel)
-      await api("/pautas", { ...data, action: operation, model: data.scriptModel, channelId })
+      await api("/pautas", { ...data, action: operation, model: data.scriptModel, channelId, channelTitle: activeChannel()?.title })
       if (route()[0] === "pautas" && channelId === cache.activeId) await navigate()
     })
   }
@@ -667,7 +675,7 @@ content.addEventListener("submit", (event) => {
       if (["produce", "animate", "audio"].includes(intent) && !roteiro) throw new Error("Escreva, cole ou gere o roteiro primeiro.")
       const next = project || (await api("/projetos", { idea: titulo, duration: Number(data.duration) || 60, manual: true, channelId: cache.activeId, pautaId:data.pautaId })).project
       if (intent === "save") {
-        await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId })
+        await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId, channelId:next.channelId })
         localStorage.removeItem(draftKey(project))
         go("criar", next.id)
         return
@@ -675,7 +683,7 @@ content.addEventListener("submit", (event) => {
       if (intent === "animate" && (roteiro !== next.roteiro.roteiro || titulo !== next.titulo || (next.voice && data.voice !== next.voice))) {
         throw new Error("Gere uma nova narração para aplicar as mudanças de título, voz ou roteiro.")
       }
-      if (!next.audio) await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId })
+      if (!next.audio) await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId, channelId:next.channelId })
       go("gerando", next.id)
       try {
         const narrated = intent === "animate" ? next : await jobResult(await projectApi(next, "narracao", { titulo, roteiro, voice: data.voice, descricao: next.roteiro?.descricao }))
@@ -768,7 +776,15 @@ document.addEventListener("click", (event) => {
     document.querySelector(".compare-grid").dataset.tab = id
     document.querySelectorAll("[data-action=compare-tab]").forEach((item) => item.setAttribute("aria-pressed", String(item === button)))
   }
-  if (kind === "channel") { localStorage.setItem("studio-channel", id); cache.time = 0; go("inicio") }
+  if (kind === "channel") action(async () => {
+    const selected = cache.channels.find(channel => channel.id === id)
+    if (hosted && selected && !selected.banner) {
+      try { await api("/perfil-canal", { ref: selected.id }) } catch { /* The cached profile remains usable. */ }
+    }
+    localStorage.setItem("studio-channel", id)
+    cache.time = 0
+    go("inicio")
+  })
   if (kind === "add-channel") action(async () => {
     const channel = await api(`/canais/pendente/${encodeURIComponent(id)}`, {})
     localStorage.setItem("studio-channel", channel.id)

@@ -79,6 +79,7 @@ window.addEventListener("message", (event) => {
     if (editorRoute) editor.contentWindow.postMessage({ type: "studio:navigate", data: editorRoute }, location.origin)
     if (pendingScript) editor.contentWindow.postMessage({ type: "studio:script", data: pendingScript }, location.origin)
   }
+  if (type === "studio:channel") updateChannelIdentity(data)
   if (type === "studio:received") pendingScript = undefined
   if (type === "studio:height" && Number.isFinite(data)) editor.style.height = Math.max(360, Math.ceil(data)) + "px"
   if (type === "studio:fields") {
@@ -86,3 +87,48 @@ window.addEventListener("message", (event) => {
     document.querySelector("#script-text").value = data.script || ""
   }
 })
+
+const primaryChannelId = "UCClrO3uvc5-H6NPc6alEHDw"
+const channelDashboard = document.querySelector("#canal")
+const channelHero = document.querySelector("#selected-channel-hero")
+const brandTitle = document.querySelector(".rail-brand-text strong")
+const originalBrandTitle = brandTitle?.cloneNode(true)
+const brandHandle = document.querySelector(".rail-brand-text small")
+const originalBrandHandle = brandHandle?.textContent
+
+function loadChannelImage(img, url, fallback) {
+  if (!img) return
+  const usable = /^https:\/\/(?:[\w.-]+\.googleusercontent\.com|yt3\.ggpht\.com)\//i.test(url || "")
+  img.hidden = true
+  if (fallback) fallback.hidden = false
+  if (!usable) { img.removeAttribute("src"); return }
+  img.referrerPolicy = "no-referrer"
+  img.onload = () => { img.hidden = false; if (fallback) fallback.hidden = true }
+  img.onerror = () => { img.hidden = true; if (fallback) fallback.hidden = false }
+  img.src = url
+  if (img.complete && img.naturalWidth) img.onload()
+}
+
+function updateChannelIdentity(profile) {
+  if (!channelHero || !channelDashboard) return
+  const alternate = Boolean(profile?.id && profile.id !== primaryChannelId)
+  channelDashboard.classList.toggle("alternate-channel", alternate)
+  channelHero.hidden = !alternate
+  if (!alternate) {
+    if (brandTitle && originalBrandTitle) brandTitle.replaceChildren(...originalBrandTitle.cloneNode(true).childNodes)
+    if (brandHandle) brandHandle.textContent = originalBrandHandle
+    window.dispatchEvent(new Event("studio:reset-brand"))
+    return
+  }
+  if (brandTitle) brandTitle.textContent = profile.title
+  if (brandHandle) brandHandle.textContent = profile.handle || "Canal do YouTube"
+  channelHero.querySelector("h2").textContent = profile.title
+  channelHero.querySelector("p").textContent = profile.handle || ""
+  channelHero.querySelector("a").href = "https://www.youtube.com/channel/" + encodeURIComponent(profile.id)
+  loadChannelImage(channelHero.querySelector(".selected-channel-logo"), profile.logo)
+  loadChannelImage(channelHero.querySelector(".selected-channel-cover"), profile.banner)
+  loadChannelImage(document.querySelector("#brand-avatar"), profile.logo, document.querySelector("#brand-fallback"))
+}
+
+const selectedProfile = JSON.parse(localStorage.getItem("studio-channel-profiles") || "[]").find(p => p.id === localStorage.getItem("studio-channel"))
+if (selectedProfile) updateChannelIdentity(selectedProfile)

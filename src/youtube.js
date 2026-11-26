@@ -169,12 +169,13 @@ export async function ytResolveChannel(raw = "", request = fetch) {
   if (!key) return null
   const s = String(raw).trim()
   const uc = s.match(/(UC[\w-]{20,})/)?.[1]
-  const handle = s.match(/@([\w.-]+)/)?.[1] || (!s.startsWith("http") && !uc ? s.replace(/^@/, "") : "")
-  const params = uc ? { part: "snippet", id: uc } : { part: "snippet", forHandle: handle }
+  const handle = s.match(/@([\p{L}\p{N}_.-]+)/u)?.[1] || (!s.startsWith("http") && !uc ? s.replace(/^@/, "") : "")
+  const params = uc ? { part: "snippet,brandingSettings", id: uc } : { part: "snippet,brandingSettings", forHandle: handle }
   const items = await list("channels", params, key, request)
   const ch = items[0]
   if (!ch) return null
-  return { id: ch.id, title: ch.snippet?.title || s, handle: ch.snippet?.customUrl || (handle ? `@${handle}` : "") }
+  return { id: ch.id, title: ch.snippet?.title || s, handle: ch.snippet?.customUrl || (handle ? `@${handle}` : ""),
+    logo: bestThumb(ch.snippet?.thumbnails), banner: ch.brandingSettings?.image?.bannerExternalUrl || "" }
 }
 
 export async function ytGetVideoComments(videoId, maxResults = 20, request = fetch) {

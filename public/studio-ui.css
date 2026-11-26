@@ -445,3 +445,5 @@ option { color:var(--ink); background:var(--well); }
 .embedded-studio .review-stage,.embedded-studio .poster-stage { border-color:var(--line); background:#071a18; }
 .embedded-studio .workspace-header .header-inner { display:flex; justify-content:space-between; }
 .embedded-studio .workspace-title { border:0; padding:0; }
+.channel-profile-form, #channel-profile-form { margin-top:1rem; }
+.channel-hero .hero-scene.channel-cover { opacity:1; object-position:center; }

@@ -688,3 +688,10 @@ audio { width: 100%; border-radius: 12px; filter: sepia(0.3) hue-rotate(110deg);
 
 .studio-embedded { display:block; width:100%; min-height:70vh; border:0; border-radius:1rem; background:#101318; }
 .studio-embedded { background:transparent; border-radius:0; }
+#canal.alternate-channel > :not(#selected-channel-hero) { display:none; }
+.selected-channel-cover { display:block; width:100%; max-height:clamp(120px,24vw,325px); object-fit:cover; object-position:center; }
+#selected-channel-hero { overflow:hidden; }
+.selected-channel-info { display:flex; flex-wrap:wrap; gap:1rem; align-items:center; padding:clamp(1rem,3vw,2rem); }
+.selected-channel-logo { width:clamp(56px,8vw,92px); aspect-ratio:1; object-fit:cover; border-radius:50%; }
+.selected-channel-info .selected-channel-link { margin-left:auto; }
+.rail-brand-text { min-width:0; overflow-wrap:anywhere; }
