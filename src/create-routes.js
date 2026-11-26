@@ -8,6 +8,7 @@ import { audioDuration } from "./timeline.js"
 import { parseJsonLoose } from "./opencode.js"
 import { askStudioGo, goKey, goModels, validGoModel } from "./studio-go.js"
 import { kitAvailability, planKitVideo, renderKitVideo, repairKitVideo, reviseKitVideo, timeKitWords } from "./video-kit.js"
+import { planStick2dVideo, renderStick2dVideo, reviseStick2dVideo } from "./stick2d.js"
 import { addStudioChannel, listStudioChannels, pendingStudioChannel, studioChannelToken } from "./studio-channels.js"
 import { getOAuthStatus, getStudioChannel, uploadShortToYouTube } from "./youtube-oauth.js"
 
@@ -158,21 +159,27 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     }
   }
 
-  async function prepareVersion(project, id, storyboard, words, modelId, progress, scene) {
+  async function prepareVersion(project, id, storyboard, words, modelId, progress, scene, style = project.style || "3d") {
     const dir = projectDir(project.id)
     const board = `storyboard-${id}.json`
     const preview = `previa-${id}.mp4`
     const out = path.join(dir, preview)
     progress(48, "Validando cenas e renderizando a prévia")
     try {
-      const validated = await renderKitVideo({
-        storyboard, words, audio: path.join(dir, project.audio), output: out, preview: true,
-        onProgress: renderProgress(progress, 48, 94),
-        repair: (value, errors) => repairKitVideo(modelId, value, errors, scene),
-      })
+      const is2d = style === "2d-palito" || storyboard?.estilo === "2d-palito"
+      const validated = is2d
+        ? await renderStick2dVideo({
+            storyboard, words, audio: path.join(dir, project.audio), output: out, preview: true,
+            onProgress: (msg, pct) => progress(48 + 46 * (pct || 0), msg),
+          })
+        : await renderKitVideo({
+            storyboard, words, audio: path.join(dir, project.audio), output: out, preview: true,
+            onProgress: renderProgress(progress, 48, 94),
+            repair: (value, errors) => repairKitVideo(modelId, value, errors, scene),
+          })
       fs.writeFileSync(path.join(dir, board), JSON.stringify(validated, null, 2))
       return {
-        id, board, preview, model: modelId, createdAt: new Date().toISOString(),
+        id, board, preview, model: modelId, style: is2d ? "2d-palito" : "3d", createdAt: new Date().toISOString(),
         scenes: validated.cenas.map(({ inicio, fim }) => ({ inicio, fim })),
       }
     } catch (error) {
@@ -292,6 +299,7 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     const idea = text(req.body?.idea, 6000)
     const duration = Number(req.body?.duration)
     const manual = req.body?.manual === true
+    const style = req.body?.style === "2d-palito" ? "2d-palito" : "3d"
     const channelId = text(req.body?.channelId, 80) || null
     if (channelId && !(await listStudioChannels()).channels.some((channel) => channel.id === channelId)) {
       throw badRequest("Escolha um canal conectado.")
@@ -303,7 +311,7 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
       const titulo = roteiro.titulos[0] || text(idea, 100) || "Novo Short"
       return commit({
         id: `fdn-${slugify(titulo) || "short"}-${randomUUID().slice(0, 8)}`,
-        studio: "fora-do-nivel", titulo, ideia: idea, duracaoAlvo: duration, roteiro, channelId,
+        studio: "fora-do-nivel", titulo, ideia: idea, duracaoAlvo: duration, style, roteiro, channelId,
         criadoEm: new Date().toISOString(), pautaId: text(req.body.pautaId, 80) || null,
       })
     }
@@ -381,23 +389,28 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     if (project.publicacao) throw badRequest("Este projeto já foi enviado ao YouTube.", 409)
     if (!project.audio) throw badRequest("Gere a narração primeiro.")
     const modelId = model(req.body?.model)
+    const style = req.body?.style === "2d-palito" ? "2d-palito" : req.body?.style === "3d" ? "3d" : (project.style || "3d")
     run(res, "animacao", project, async ({ progress }, id) => {
-      if (!await kitAvailability()) throw new Error("Instale as dependências Node do kit para renderizar.")
+      if (style !== "2d-palito" && !await kitAvailability()) throw new Error("Instale as dependências Node do kit para renderizar.")
       const audio = path.join(projectDir(project.id), project.audio)
       progress(8, "Sincronizando a narração com as legendas")
       const words = project.words ? readJson(project, project.words) : await timeKitWords(audio, project.duration)
       const wordsFile = project.words ?? `palavras-${id}.json`
       if (!project.words) fs.writeFileSync(path.join(projectDir(project.id), wordsFile), JSON.stringify(words))
-      progress(25, "Planejando as cenas com o OpenCode Go")
+      progress(25, style === "2d-palito" ? "Planejando cenas 2D (Boneco de Palito)" : "Planejando as cenas com o OpenCode Go")
       const planning = req.path.endsWith("/plano")
       if (req.body.planId && project.scenePlan?.id !== req.body.planId) throw badRequest("O plano mudou. Confira as cenas novamente.", 409)
-      const storyboard = !planning && project.scenePlan ? project.scenePlan.board : await planKitVideo({ model: modelId, title: project.titulo, script: project.roteiro.roteiro, duration: project.duration, words })
+      const storyboard = !planning && project.scenePlan
+        ? project.scenePlan.board
+        : style === "2d-palito"
+          ? await planStick2dVideo({ model: modelId, title: project.titulo, script: project.roteiro.roteiro, duration: project.duration, words })
+          : await planKitVideo({ model: modelId, title: project.titulo, script: project.roteiro.roteiro, duration: project.duration, words })
       if (planning) {
         const scenes = storyboard.cenas.map(scene => words.filter(w => w.inicio >= scene.inicio && w.inicio < scene.fim).map(w => w.palavra).join(" "))
-        return commit({ ...project, words: wordsFile, animationModel: modelId, scenePlan: { id, board: storyboard, narration: scenes } })
+        return commit({ ...project, style, words: wordsFile, animationModel: modelId, scenePlan: { id, board: storyboard, narration: scenes } })
       }
-      const version = await prepareVersion(project, id, storyboard, words, modelId, progress)
-      return commit({ ...project, scenePlan: null, words: wordsFile, animationModel: modelId, versions: [...(project.versions ?? []), version], selectedVersion: id, mp4: null, exportedVersion: null })
+      const version = await prepareVersion(project, id, storyboard, words, modelId, progress, undefined, style)
+      return commit({ ...project, style, scenePlan: null, words: wordsFile, animationModel: modelId, versions: [...(project.versions ?? []), version], selectedVersion: id, mp4: null, exportedVersion: null })
     })
   }))
   router.post("/projetos/:id/plano/ajuste", route((req, res) => {
@@ -432,10 +445,14 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     const user = { role: "user", text: message, scene, time, version: version.id, attachment: Boolean(image) }
     run(res, "revisao", project, async ({ progress }, id) => {
       progress(20, "Consultando o modelo escolhido")
-      const edit = await reviseKitVideo({ model: modelId, storyboard: readJson(project, version.board), scene, time, history, message, image })
+      const currentBoard = readJson(project, version.board)
+      const is2d = currentBoard?.estilo === "2d-palito" || version.style === "2d-palito" || project.style === "2d-palito"
+      const edit = is2d
+        ? await reviseStick2dVideo({ model: modelId, storyboard: currentBoard, scene, time, history, message, image })
+        : await reviseKitVideo({ model: modelId, storyboard: currentBoard, scene, time, history, message, image })
       let updates = {}
       if (edit.storyboard) {
-        const next = await prepareVersion(project, id, edit.storyboard, readJson(project, project.words), modelId, progress, scene)
+        const next = await prepareVersion(project, id, edit.storyboard, readJson(project, project.words), modelId, progress, scene, is2d ? "2d-palito" : "3d")
         updates = { versions: [...project.versions, next], selectedVersion: id, exportedVersion: null, mp4: null }
       }
       const assistant = { role: "assistant", text: edit.response, model: modelId, scene, time, version: updates.selectedVersion || version.id }
@@ -463,10 +480,20 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
       const output = path.join(dir, mp4)
       progress(20, "Renderizando MP4 vertical em 1080 × 1920")
       try {
-        await renderKitVideo({
-          storyboard: readJson(project, version.board), words: readJson(project, project.words),
-          audio: path.join(dir, project.audio), output, onProgress: renderProgress(progress, 20, 96),
-        })
+        const board = readJson(project, version.board)
+        const words = readJson(project, project.words)
+        const is2d = board?.estilo === "2d-palito" || version.style === "2d-palito" || project.style === "2d-palito"
+        if (is2d) {
+          await renderStick2dVideo({
+            storyboard: board, words, audio: path.join(dir, project.audio), output,
+            onProgress: (msg, pct) => progress(20 + 76 * (pct || 0), msg),
+          })
+        } else {
+          await renderKitVideo({
+            storyboard: board, words,
+            audio: path.join(dir, project.audio), output, onProgress: renderProgress(progress, 20, 96),
+          })
+        }
         return commit({ ...project, mp4, exportedVersion: version.id })
       } catch (error) {
         fs.rmSync(output, { force: true })

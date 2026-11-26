@@ -306,11 +306,12 @@ function scriptMeterText(text) {
 
 function settingsSummaryText(form) {
   if (!form) return ""
+  const styleLabel = form.elements.style?.value === "2d-palito" ? "2D Palito" : "3D"
   const dur = form.elements.duration?.value
   const voiceOpt = form.elements.voice?.selectedOptions?.[0]?.textContent?.split("·")[0]?.trim()
   const modelId = form.elements.animationModel?.value || ""
   const modelName = modelId.split("/").at(-1) || ""
-  return [dur ? `${dur}s` : "", voiceOpt, modelName].filter(Boolean).join(" · ")
+  return [styleLabel, dur ? `${dur}s` : "", voiceOpt, modelName].filter(Boolean).join(" · ")
 }
 
 function updateCreateMeta(form) {
@@ -338,7 +339,13 @@ function create(project) {
         <input type="hidden" name="pautaId">
         <div class="script-start-actions"><a class="text-link" href="#pautas">Sugerir temas com IA →</a><button class="button secondary" name="intent" value="script" ${!config.go ? "disabled" : ""}>Gerar roteiro</button></div>
       </div>`}
-      <label>Título<input name="title" maxlength="100" value="${html(project?.titulo)}" placeholder="Título do vídeo"></label>
+      <div class="fields">
+        <label>Título<input name="title" maxlength="100" value="${html(project?.titulo)}" placeholder="Título do vídeo"></label>
+        <label>Estilo da animação<select name="style">
+          <option value="3d"${(project?.style || "3d") === "3d" ? " selected" : ""}>3D Explicativo (Low-Poly)</option>
+          <option value="2d-palito"${project?.style === "2d-palito" ? " selected" : ""}>2D Boneco de Palito (Nina, Beto, Léo)</option>
+        </select></label>
+      </div>
       <div class="story-editor-wrap">
         <div class="story-editor-head"><span>Roteiro</span><span id="script-meter" class="script-meter">${scriptMeterText(project?.roteiro?.roteiro)}</span></div>
         <label class="story-editor"><span class="sr-only">Roteiro</span><textarea name="script" rows="12" maxlength="5000" placeholder="Escreva ou cole a narração…">${html(project?.roteiro?.roteiro)}</textarea></label>
@@ -819,7 +826,7 @@ content.addEventListener("submit", (event) => {
       localStorage.setItem("animationModel", data.animationModel)
       if (intent === "script") {
         if (!data.idea?.trim()) throw new Error("Digite o tema do vídeo.")
-        const next = await jobResult(await api("/projetos", { idea: data.idea, duration: Number(data.duration), channelId: cache.activeId, model: data.scriptModel, pautaId: data.pautaId }))
+        const next = await jobResult(await api("/projetos", { idea: data.idea, duration: Number(data.duration), style: data.style, channelId: cache.activeId, model: data.scriptModel, pautaId: data.pautaId }))
         localStorage.removeItem(draftKey(project))
         go("criar", next.id)
         return
@@ -827,7 +834,7 @@ content.addEventListener("submit", (event) => {
       const titulo = data.title?.trim() || data.idea?.trim() || "Novo vídeo"
       const roteiro = data.script?.trim() || ""
       if (["produce", "animate", "audio"].includes(intent) && !roteiro) throw new Error("Escreva, cole ou gere o roteiro primeiro.")
-      const next = project || (await api("/projetos", { idea: titulo, duration: Number(data.duration) || 60, manual: true, channelId: cache.activeId, pautaId:data.pautaId })).project
+      const next = project || (await api("/projetos", { idea: titulo, duration: Number(data.duration) || 60, style: data.style, manual: true, channelId: cache.activeId, pautaId:data.pautaId })).project
       if (intent === "render3d") {
         if (!next.audio) throw new Error("Gere a narração primeiro.")
         if (roteiro !== next.roteiro?.roteiro || titulo !== next.titulo) throw new Error("Gere uma nova narração para aplicar mudanças no roteiro ou no título.")
@@ -857,7 +864,7 @@ content.addEventListener("submit", (event) => {
           await startBrowserRender(narrated, data.animationModel)
           return
         }
-        const animated = await jobResult(await projectApi(narrated, intent === "animate" ? "plano" : "animacao", { model: data.animationModel }))
+        const animated = await jobResult(await projectApi(narrated, intent === "animate" ? "plano" : "animacao", { model: data.animationModel, style: data.style }))
         go(intent === "animate" ? "criar" : "revisao", animated.id)
       } catch (error) { go("criar", next.id); throw error }
     })
@@ -929,7 +936,8 @@ document.addEventListener("click", (event) => {
     const form = document.querySelector("#create-form")
     if (form.elements.script.value.trim() !== project.roteiro.roteiro || (project.voice && form.elements.voice.value !== project.voice)) throw Error("Gere uma narração com o texto e a voz escolhidos antes de aprovar as cenas.")
     const model = form.elements.animationModel.value
-    const job = await projectApi(project,"animacao",{model,planId:project.scenePlan.id})
+    const style = form.elements.style?.value
+    const job = await projectApi(project,"animacao",{model,style,planId:project.scenePlan.id})
     go("gerando",project.id)
     try { const result = await jobResult(job); go("revisao",result.id) }
     catch(error) { go("criar",project.id); throw error }
