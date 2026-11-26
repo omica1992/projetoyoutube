@@ -288,7 +288,11 @@ function create(project) {
       ${!hosted && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}</div>
     </form><aside class="surface production-preview"><div class="workspace-panel-title"><h2>Prévia</h2><span class="workspace-badge">${project?.urls?.mp4 || version(project) ? "Do projeto" : "Referência visual"}</span></div>
       <div class="poster-stage">${version(project) || project?.urls?.mp4 ? `<video class="portrait" controls playsinline preload="metadata" src="${html(version(project) ? videoUrl(project, version(project)) : project.urls.mp4)}"></video>` : `<img class="portrait" src="/studio-concept.webp" alt="Ilustração de referência de um rolo compactador na estrada">`}</div>
-      <p>Formato vertical · 9:16</p></aside></div>${planView(project)}${!hosted && project && !project.publicacao ? link("publicar","Vincular um Short já publicado",project.id,"text-link") : ""}`
+      <p>Formato vertical · 9:16</p></aside></div>${planView(project)}
+    ${project?.htmlDocuments?.length ? `<details class="surface planning-card scene-plan"><summary>Versões do HTML do projeto</summary><ul class="idea-list">${[...project.htmlDocuments].reverse().map((version, index) =>
+      `<li><a href="/api/criar/projetos/${encodeURIComponent(project.id)}/html/${encodeURIComponent(version.id)}" download>${index === 0 ? "Baixar HTML atual" : "Baixar versão anterior"} · ${html(new Date(version.createdAt).toLocaleString("pt-BR"))}</a></li>`
+    ).join("")}</ul></details>` : ""}
+    ${!hosted && project && !project.publicacao ? link("publicar","Vincular um Short já publicado",project.id,"text-link") : ""}`
 }
 
 function generating(project) {
@@ -436,10 +440,10 @@ function redraw(page, project, pending) {
   if (page === "criar") {
     restoreDraft(project)
     const form = document.querySelector("#create-form")
-    if (importedScript && !project) {
+    if (importedScript && (!project || importedScript.applyDraft)) {
       const { title, idea, script } = importedScript
       for (const [name, value] of Object.entries({ title, idea, script })) {
-        if (typeof value === "string") form.elements[name].value = value.slice(0, form.elements[name].maxLength)
+        if (typeof value === "string" && form.elements[name]) form.elements[name].value = value.slice(0, form.elements[name].maxLength)
       }
       saveDraft(form)
       importedScript = undefined
@@ -905,7 +909,7 @@ if (embedded) {
     if (event.data.type !== "studio:script") return
     if (!data || typeof data !== "object") return
     const openSaved = typeof data.id === "string" && (hosted || data.id.startsWith("fdn-"))
-    importedScript = openSaved ? undefined : data
+    importedScript = openSaved && !data.applyDraft ? undefined : data
     go("criar", openSaved ? data.id : undefined)
     sendToPanel("studio:received")
   })

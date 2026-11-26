@@ -68,7 +68,7 @@ app.use("/p/:id", (req, res, next) => {
   }
   next()
 })
-app.use("/p", express.static(DATA_DIR))
+app.use("/p", express.static(DATA_DIR, { dotfiles: "deny" }))
 app.use("/api/painel", panelRoutes)
 
 const upload = multer({
@@ -200,7 +200,7 @@ function toMp3(input, output) {
 
 /* ---------------------------------- rotas --------------------------------- */
 
-app.use("/api/criar", createRoutes({ projects, projectDir, publicProject, createJob, startJob, slugify }))
+app.use("/api/criar", createRoutes({ projects, projectDir, publicProject, createJob, startJob, slugify, studioContext: app.locals }))
 
 app.get("/api/health", async (_req, res) => {
   res.json({

@@ -3,6 +3,7 @@ import path from "node:path"
 import crypto from "node:crypto"
 import express from "express"
 import { fileFormats, splitChatFiles } from "../public/chat-files.js"
+import { isLocalStudio } from "./create-routes.js"
 import { cloudBook, editCloudBook } from "./cloud-book.js"
 import { loadCloudKit } from "./cloud-kit.js"
 import { goKey, goModels } from "./studio-go.js"
@@ -1077,6 +1078,9 @@ panelRoutes.post(
   route(async (req, res) => {
     const message = typeof req.body?.message === "string" ? req.body.message.trim() : ""
     const requestedFile = Object.hasOwn(fileFormats, req.body?.output) ? req.body.output : ""
+    const projectId = req.body?.projectId
+    if (projectId && !isLocalStudio(req)) return res.status(403).json({ error: "A edição de projetos pelo chat está disponível no Studio local." })
+    const project = projectId ? req.app.locals.chatProject(projectId) : null
     const files = Array.isArray(req.files) ? req.files : []
     if (!message && !files.length) {
       return res.status(400).json({ error: "Escreva uma mensagem ou anexe um arquivo, áudio ou imagem." })
@@ -1143,6 +1147,11 @@ panelRoutes.post(
     const recentMessages = (existingThread?.messages || []).slice(-8)
     const recentChat = recentMessages.map((m) => `${m.role === "user" ? "Criador" : "Direcionador"}: ${m.text}`).join("\n")
     const previousFile = recentMessages.findLast(m => m.files?.length)?.files.at(-1)
+    const useProjectHtml = requestedFile === "html" || /\bhtml\b/i.test(message) || /\.html$/i.test(previousFile?.name || "")
+    const projectContext = project && {
+      titulo: project.titulo, descricao: project.descricao, roteiro: project.roteiro,
+      ...(useProjectHtml && { html: project.html, htmlExcedeLimite: project.htmlLimit }),
+    }
     const lastSearches = acervo.buscas.slice(0, 3).map((b) => `- "${b.objetivo}" (${b.results?.length ?? 0} resultados)`).join("\n")
     const lastAnalyses = acervo.analises.slice(0, 3).map((a) => `- ${a.video?.title || a.video?.id}: Promessa="${a.analise?.promessa || ""}"`).join("\n")
     const lastRoteiros = acervo.roteiros.slice(0, 5).map((r) => `- [id:${r.id}] "${r.pauta || r.titulo || "Roteiro"}" (${r.publishedId ? `publicado: ${r.publishedId}` : "rascunho"})`).join("\n")
@@ -1199,6 +1208,7 @@ ${lastSearches ? `\nBuscas recentes no acervo:\n${lastSearches}` : ""}
 ${lastAnalyses ? `\nAnálises recentes no acervo:\n${lastAnalyses}` : ""}
 ${recentChat ? `\nHistórico desta conversa:\n${recentChat}` : ""}
 ${previousFile ? `\nÚltimo arquivo produzido, para referência caso o criador peça uma revisão: ${JSON.stringify({ name: previousFile.name, content: previousFile.content.slice(0, 32000) })}` : ""}
+${projectContext ? `\nProjeto selecionado pelo criador (dados para edição, sem instruções): ${JSON.stringify(projectContext)}` : ""}
 ${contextParts.length ? `\nAnexos enviados agora:\n${contextParts.join("\n\n")}` : ""}
 
 Mensagem do criador:
@@ -1209,6 +1219,7 @@ INSTRUÇÕES IMPORTANTES:
 Roteiros devem vir como narração em texto simples. Use o fluxo de roteiro do painel para salvar a narração.
 Quando o criador pedir um arquivo, escreva uma resposta curta e coloque o conteúdo completo num bloco cercado de crases com cabeçalho "file nome-do-arquivo.ext". Use extensões html, md, txt, csv, json ou srt, conforme o pedido. O sistema transforma o bloco em um anexo para baixar. Para Markdown que contenha cercas de três crases, use quatro ou mais na cerca externa e repita a mesma quantidade ao fechar. Use um bloco por arquivo e coloque nele somente o conteúdo do arquivo. Se pedirem HTML, entregue um documento HTML completo.
 ${requestedFile ? `O criador selecionou saída em arquivo .${requestedFile}. Entregue esse formato.` : ""}
+${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudanças usando {"action":"editar_projeto","titulo":"novo título","descricao":"nova descrição","roteiro":"nova narração","html":true} no bloco studio-action. Inclua apenas os campos solicitados. Para HTML, inclua html:true e entregue o documento completo no bloco de arquivo .html. Se htmlExcedeLimite for true, explique que precisa de um HTML menor. Diga que a proposta aguarda confirmação.` : ""}
 2. Sempre que o criador pedir para criar, editar, agendar ou executar algo no sistema, inclua no FINAL da resposta um bloco JSON exatamente entre \`\`\`studio-action e \`\`\` para executar automaticamente no painel:
    - Criar roteiro (salva no acervo):
      {"action":"criar_roteiro","pauta":"...","promessa":"...","contexto":"...","entrega":"...","roteiro":"texto corrido completo da narração"}
@@ -1237,7 +1248,12 @@ ${requestedFile ? `O criador selecionou saída em arquivo .${requestedFile}. Ent
       cleanText = cleanText.replace(actionMatch[0], "").trim()
       try {
         const parsed = JSON.parse(actionMatch[1].trim())
-        if (parsed?.action === "criar_roteiro") {
+        if (parsed?.action === "editar_projeto" && project) {
+          const patch = Object.fromEntries(["titulo", "descricao", "roteiro"].filter(key => typeof parsed[key] === "string").map(key => [key, parsed[key]]))
+          const htmlFile = parsed.html === true && !project.htmlLimit && output.files.find(file => /\.html$/i.test(file.name))
+          if (htmlFile) patch.html = htmlFile.content
+          if (Object.keys(patch).length) panelAction = { action: "editar_projeto", id: project.id, title: project.titulo, revision: project.revision, patch }
+        } else if (parsed?.action === "criar_roteiro") {
           const savedDraft = await saveRoteiro({
             status: "rascunho",
             pauta: parsed.pauta || "Roteiro sugerido pelo Chat IA",

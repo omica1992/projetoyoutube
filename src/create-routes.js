@@ -1,6 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
-import { randomUUID, timingSafeEqual } from "node:crypto"
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto"
 import express from "express"
 import { notebook, updateNotebook, suggestIdeas, youtubeVideoId } from "./studio-planning.js"
 import { ARLO, generateNarration, googleVoices, providerKey, VOICE_CATALOG } from "./panel-providers.js"
@@ -34,7 +34,7 @@ export function isLocalStudio(req, oauthCallback = false) {
     (oauthCallback || req.get("sec-fetch-site") !== "cross-site"))
 }
 
-export function createRoutes({ projects, projectDir, publicProject, createJob, startJob, slugify }) {
+export function createRoutes({ projects, projectDir, publicProject, createJob, startJob, slugify, studioContext = {} }) {
   const router = express.Router()
   const active = new Map()
 
@@ -64,9 +64,84 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
     return project
   }
 
-  const route = (fn) => async (req, res) => {
-    try { await fn(req, res) }
-    catch (e) { res.status(e.status ?? 500).json({ error: e.message }) }
+  function chatContext(id) {
+    const project = get(id)
+    const dir = projectDir(project.id)
+    const latest = project.htmlDocuments?.at(-1)?.id
+    const legacy = project.html || (project.htmlFonte ? "video.html" : "")
+    const file = latest ? path.join(dir, ".chat-html", latest + ".html")
+      : legacy && path.basename(legacy) === legacy ? path.join(dir, legacy) : ""
+    const metadata = file && fs.existsSync(file) ? fs.lstatSync(file) : null
+    const html = metadata?.isFile() && metadata.size <= 120000 ? fs.readFileSync(file, "utf8") : ""
+    return {
+      id, titulo: project.titulo, roteiro: project.roteiro?.roteiro || "", descricao: project.roteiro?.descricao || "",
+      html, htmlLimit: Boolean(metadata && metadata.size > 120000),
+      revision: createHash("sha256").update(JSON.stringify(project)).update(html).digest("hex"),
+    }
+  }
+
+  studioContext.chatProject = chatContext
+
+  router.get("/chat-projetos", route((_req, res) => {
+    res.json([...projects.values()].filter(project => project.studio === "fora-do-nivel" && !project.publicacao)
+      .map(({ id, titulo }) => ({ id, titulo })))
+  }))
+
+  router.post("/projetos/:id/editar-chat", route((req, res) => {
+    const project = get(req.params.id)
+    if (active.has(project.id) || project.publicacao) throw badRequest("Este projeto não pode ser alterado agora.", 409)
+    if (req.body.revision !== chatContext(project.id).revision) throw badRequest("O projeto mudou. Peça uma nova proposta ao chat.", 409)
+    const patch = req.body.patch
+    if (!patch || typeof patch !== "object" || Array.isArray(patch) || !Object.keys(patch).length ||
+        Object.keys(patch).some(key => !["titulo", "descricao", "roteiro", "html"].includes(key))) throw badRequest("Proposta inválida.")
+    const next = { ...project, roteiro: { ...project.roteiro } }
+    if (Object.hasOwn(patch, "titulo")) {
+      next.titulo = text(patch.titulo, 100)
+      if (!next.titulo) throw badRequest("O título precisa ser preenchido.")
+    }
+    if (Object.hasOwn(patch, "descricao")) next.roteiro.descricao = text(patch.descricao, 5000)
+    if (Object.hasOwn(patch, "roteiro")) {
+      next.roteiro.roteiro = text(patch.roteiro, 5000)
+      if (project.audio && next.roteiro.roteiro !== project.roteiro?.roteiro) {
+        throw badRequest("Este roteiro já tem narração. Abra o editor com a proposta e gere a nova narração.", 409)
+      }
+    }
+    let documentPath
+    if (Object.hasOwn(patch, "html")) {
+      const source = patch.html
+      if (typeof source !== "string" || Buffer.byteLength(source) > 120000 || !/<html(?:\s|>)[\s\S]*<\/html\s*>/i.test(source)) {
+        throw badRequest("Envie um HTML completo de até 120 KB.")
+      }
+      const id = randomUUID()
+      const dir = path.join(projectDir(project.id), ".chat-html")
+      fs.mkdirSync(dir, { recursive: true })
+      documentPath = path.join(dir, id + ".html")
+      fs.writeFileSync(documentPath, source, { flag: "wx" })
+      next.htmlDocuments = [...(project.htmlDocuments || []), { id, createdAt: new Date().toISOString() }]
+    }
+    try { commit(next) }
+    catch (error) {
+      if (documentPath) fs.rmSync(documentPath, { force: true })
+      throw error
+    }
+    res.json({ project: view(next) })
+  }))
+
+  router.get("/projetos/:id/html/:version", route((req, res) => {
+    const project = get(req.params.id)
+    const version = project.htmlDocuments?.find(item => item.id === req.params.version)
+    if (!version || !/^[a-f0-9-]{36}$/.test(version.id)) throw badRequest("Versão não encontrada.", 404)
+    const file = path.join(projectDir(project.id), ".chat-html", version.id + ".html")
+    if (!fs.existsSync(file)) throw badRequest("Arquivo não encontrado.", 404)
+    res.set({ "Content-Security-Policy": "sandbox", "X-Content-Type-Options": "nosniff" })
+      .attachment("projeto.html").type("application/octet-stream").send(fs.readFileSync(file))
+  }))
+
+  function route(fn) {
+    return async (req, res) => {
+      try { await fn(req, res) }
+      catch (e) { res.status(e.status ?? 500).json({ error: e.message }) }
+    }
   }
 
   function model(value) {

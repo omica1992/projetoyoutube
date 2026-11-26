@@ -773,3 +773,5 @@ body[data-workspace=producao] .model-picker { display:none; }
   .model-picker { min-width:0; max-width:min(48vw,15rem); }
   .model-picker select { min-width:0; max-width:100%; text-overflow:ellipsis; }
 }
+.chat-edit-preview { flex:1 0 100%; min-width:0; overflow-wrap:anywhere; }
+.chat-edit-preview p { white-space:pre-wrap; margin:.25rem 0 .65rem; }

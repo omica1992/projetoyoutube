@@ -889,6 +889,23 @@ let lastChatList = []
 let chatBusy = false
 const chatBox = $("#chat-messages")
 const chatInput = $("#chat-input")
+async function loadChatProjects() {
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(location.hostname)) return
+  try {
+    const select = $("#chat-project")
+    const current = select.value
+    const projects = await apiJson("/api/criar/chat-projetos")
+    select.replaceChildren(new Option(projects.length ? "Sem projeto" : "Crie um projeto para editar", ""),
+      ...projects.map(p => new Option(p.titulo, p.id)))
+    select.disabled = !projects.length
+    if (projects.some(p => p.id === current)) select.value = current
+    $("#chat-project-target").hidden = false
+  } catch {}
+}
+window.addEventListener("workspace:change", (event) => {
+  if (event.detail?.id === "chat") loadChatProjects()
+})
+if (location.hash === "#chat") loadChatProjects()
 const chatFiles = $("#chat-files")
 
 function aiAvatar() {
@@ -941,7 +958,30 @@ function actionCard(m) {
   if (!act) return null
   const card = el("div", "", "chat-action-card")
   const label = el("span")
-  if (act.action === "criar_roteiro" && act.savedDraft) {
+  if (act.action === "editar_projeto" && act.patch) {
+    label.textContent = `Alterações propostas em “${act.title}”`
+    const preview = el("details", "", "chat-edit-preview")
+    preview.append(el("summary", "Revisar alterações"))
+    for (const [field, title] of Object.entries({ titulo:"Título", descricao:"Descrição", roteiro:"Roteiro" })) {
+      if (Object.hasOwn(act.patch, field)) preview.append(el("strong", title), el("p", act.patch[field] || "Campo vazio"))
+    }
+    if (act.patch.html) preview.append(el("p", "O HTML será salvo como uma nova versão. Confira o arquivo acima."))
+    const apply = btn("Aplicar ao projeto", async () => {
+      apply.disabled = true
+      try {
+        await jsonPost(`/api/criar/projetos/${encodeURIComponent(act.id)}/editar-chat`, { revision: act.revision, patch: act.patch })
+        apply.textContent = "Aplicado"
+        toast("Alterações salvas no projeto")
+      } catch (error) {
+        toast(error.message)
+        apply.disabled = false
+      }
+    }, "primary", "check")
+    card.append(label, preview, apply)
+    if (typeof act.patch.roteiro === "string") card.append(btn("Abrir proposta no editor", () => {
+      openStudioScript({ id: act.id, script: act.patch.roteiro, title: act.patch.titulo, applyDraft: true })
+    }, "ghost", "pen"))
+  } else if (act.action === "criar_roteiro" && act.savedDraft) {
     label.append(icon("check"), document.createTextNode(`Rascunho criado no painel: “${act.savedDraft.pauta}”`))
     card.append(label, btn("Abrir no editor", () => loadSavedScript(act.savedDraft), "primary", "pen"))
   } else if (act.action === "buscar" && act.query) {
@@ -1213,6 +1253,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
   const fd = new FormData()
   fd.append("message", message)
   fd.append("output", $("#chat-output").value)
+  if ($("#chat-project").value) fd.append("projectId", $("#chat-project").value)
   fd.append("model", currentModel())
   if (activeChatId) fd.append("chatId", activeChatId)
   for (const f of files) fd.append("files", f)
