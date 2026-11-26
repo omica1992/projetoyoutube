@@ -136,12 +136,12 @@ export async function saveAnalise(entry) {
 export async function saveRoteiro(entry) {
   const now = new Date().toISOString()
   const item = {
-    id: entry.id || crypto.randomUUID(),
     status: entry.status || "validado",
     archived: false,
     createdAt: entry.createdAt || now,
     updatedAt: now,
     ...entry,
+    id: entry.id || crypto.randomUUID(),
   }
   if (hasSupabase()) {
     await sbUpsert("fatonexo_acervo", [

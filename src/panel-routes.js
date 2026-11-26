@@ -2,6 +2,8 @@ import fs from "node:fs"
 import path from "node:path"
 import crypto from "node:crypto"
 import express from "express"
+import { cloudBook, editCloudBook } from "./cloud-book.js"
+import { goKey, goModels } from "./studio-go.js"
 import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
@@ -21,7 +23,7 @@ import {
   writeConcorrentes,
 } from "./extras.js"
 import { askFallback, parseJsonLoose } from "./opencode.js"
-import { generateNarration, providerKey, storeProviderKey, verifyGemini, CHANNEL_ID, VOICE_CATALOG } from "./panel-providers.js"
+import { ARLO, googleVoices, generateNarration, providerKey, storeProviderKey, verifyGemini, CHANNEL_ID, VOICE_CATALOG } from "./panel-providers.js"
 import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey } from "./youtube.js"
 import { getChannelPublicOverview, getVideoDetailsAndTranscript, searchYouTubePublic } from "./youtube-public.js"
 import { transcribeAudio } from "./transcribe.js"
@@ -209,6 +211,17 @@ const route = (handler) => async (req, res) => {
     res.status(502).json({ error: message })
   }
 }
+
+panelRoutes.get("/studio/config", route(async (_req,res) => {
+  const [catalog,go,gemini] = await Promise.all([goModels(),goKey(),providerKey("gemini")])
+  res.json({ models:Object.keys(catalog),modelCatalog:catalog,voices:[ARLO,...VOICE_CATALOG],go:Boolean(go),gemini:Boolean(gemini),kit:false,cloud:true })
+}))
+panelRoutes.get("/studio/vozes", route(async (_req,res) => res.json((await googleVoices(await providerKey("gemini"))).filter(v=>!/^voice(?:key)?_/.test(v.id)))))
+panelRoutes.get("/studio/pautas", route(async (_req,res) => res.json(await cloudBook())))
+panelRoutes.post("/studio/pautas", route(async (req,res) => {
+  if (!hasSupabase()) return res.status(503).json({error:"Supabase indisponível."})
+  res.json(await editCloudBook(req.body))
+}))
 
 panelRoutes.get(
   "/modelos",
@@ -486,6 +499,7 @@ panelRoutes.post(
     const saved = await saveRoteiro({
       id: typeof req.body?.id === "string" ? req.body.id : undefined,
       status: "validado",
+      pautaId: typeof req.body?.pautaId === "string" ? req.body.pautaId.slice(0,80) : undefined,
       pauta,
       duracao: Number(req.body?.duracao) || 45,
       tom: typeof req.body?.tom === "string" ? req.body.tom.trim() : "",
@@ -507,6 +521,7 @@ panelRoutes.post(
     const saved = await saveRoteiro({
       id: typeof req.body?.id === "string" && req.body.id ? req.body.id : undefined,
       status: "rascunho",
+      pautaId: typeof req.body?.pautaId === "string" ? req.body.pautaId.slice(0,80) : undefined,
       pauta: pauta || "Rascunho sem título",
       duracao: Number(req.body?.duracao) || 45,
       tom: typeof req.body?.tom === "string" ? req.body.tom.trim() : "",

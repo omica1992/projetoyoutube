@@ -31,10 +31,10 @@ export async function sbSelect(table, query = "") {
   return res.json()
 }
 
-export async function sbUpsert(table, rows, onConflict = "id") {
+export async function sbUpsert(table, rows, onConflict = "id", ignoreDuplicates = false) {
   const res = await fetch(`${baseUrl()}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`, {
     method: "POST",
-    headers: headers({ Prefer: "resolution=merge-duplicates,return=representation" }),
+    headers: headers({ Prefer: `resolution=${ignoreDuplicates ? "ignore" : "merge"}-duplicates,return=representation` }),
     body: JSON.stringify(rows),
     signal: AbortSignal.timeout(10_000),
   })

@@ -1,6 +1,7 @@
 const content = document.querySelector("#content")
 const header = document.querySelector("#header")
 const status = document.querySelector("#status")
+const hosted = document.documentElement.dataset.runtime === "cloud"
 const apiRoot = "/api/criar"
 const cache = {
   audio: null, channels: [], config: null, current: null, projects: [], activeId: "", originalId: null,
@@ -25,6 +26,7 @@ function studioNav() {
 }
 
 async function api(url, payload) {
+  if (hosted) return (await import("/studio-cloud.js")).cloudApi(url,payload)
   const response = await fetch(url.startsWith("/api/") ? url : apiRoot + url, payload === undefined ? {} : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
   })
@@ -250,7 +252,7 @@ function create(project) {
   const voices = (project?.voice && !available.some(v => v.id === project.voice) ? [...available,{id:project.voice,label:project.voice}] : available).map((voice) => `<option value="${html(voice.id)}"${(project?.voice || "en-us-arlo") === voice.id ? " selected" : ""}>${html(voice.label || voice.id)}</option>`).join("")
   return `${heading(project ? "Editar roteiro" : "Criar vídeo")}
     ${!config.go ? '<p class="notice">A chave do OpenCode Go ainda não está configurada no servidor.</p>' : ""}
-    ${!config.kit ? '<p class="notice">O motor 3D precisa das dependências do kit para gerar as cenas.</p>' : ""}
+    ${!config.kit ? `<p class="notice">${hosted ? "A renderização de animações 3D ainda não está disponível nesta hospedagem." : "O motor 3D precisa das dependências do kit para gerar as cenas."}</p>` : ""}
     <div class="production-grid"><form id="create-form" class="surface form production-form">
       ${project?.id ? "" : `<div class="story-tools"><label>Tema para a IA<input name="idea" placeholder="Escolha um tema ou escreva uma ideia" maxlength="2000"></label><input type="hidden" name="pautaId"><a class="text-link" href="#pautas">Sugerir temas com IA →</a>
         <label>Duração alvo<select name="duration">${opts}</select></label>${modelOptions("IA do roteiro", "scriptModel", null, "opencode-go/deepseek-v4.1-flash")}
@@ -258,13 +260,13 @@ function create(project) {
       <label>Título<input name="title" maxlength="100" value="${html(project?.titulo)}" placeholder="Título do vídeo"></label>
       <label class="story-editor">Roteiro<textarea name="script" rows="9" maxlength="5000" placeholder="Escreva ou cole a narração…">${html(project?.roteiro?.roteiro)}</textarea></label>
       <div class="fields">${modelOptions("IA da animação", "animationModel", project?.animationModel, "opencode-go/kimi-k3")}<div><label>Buscar voz do Google<input id="voice-search" type="search" placeholder="Nome ou idioma, ex.: Arlo, pt-BR"></label><label>Voz<select name="voice">${voices}</select></label><small id="voice-count" aria-live="polite">${config.gemini ? "Carregando biblioteca…" : "Vozes locais"}</small></div></div>
-      ${project?.urls?.audio ? `<audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>` : ""}
+      ${project?.urls?.audio ? `<audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>${hosted ? `<a class="text-link" href="${html(project.urls.audio)}" download="narracao.wav">Baixar narração WAV</a>` : ""}` : ""}
       ${!config.gemini ? '<p class="notice">Configure a chave Gemini no servidor para gerar a narração.</p>' : ""}
       <small class="draft-status" role="status"></small><div class="actions"><button class="button secondary" name="intent" value="save">Salvar roteiro</button><button class="button secondary" name="intent" value="audio" ${!config.gemini || project?.publicacao ? "disabled" : ""}>Gerar só a narração</button><button class="button" name="intent" value="produce" ${!config.go || !config.gemini || !config.kit || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
-      ${project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}</div>
+      ${!hosted && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}</div>
     </form><aside class="surface production-preview"><div class="workspace-panel-title"><h2>Prévia</h2><span class="workspace-badge">${project?.urls?.mp4 || version(project) ? "Do projeto" : "Referência visual"}</span></div>
       <div class="poster-stage">${version(project) || project?.urls?.mp4 ? `<video class="portrait" controls playsinline preload="metadata" src="${html(version(project) ? videoUrl(project, version(project)) : project.urls.mp4)}"></video>` : `<img class="portrait" src="/studio-concept.webp" alt="Ilustração de referência de um rolo compactador na estrada">`}</div>
-      <p>Formato vertical · 9:16</p></aside></div>${planView(project)}${project && !project.publicacao ? link("publicar","Vincular um Short já publicado",project.id,"text-link") : ""}`
+      <p>Formato vertical · 9:16</p></aside></div>${planView(project)}${!hosted && project && !project.publicacao ? link("publicar","Vincular um Short já publicado",project.id,"text-link") : ""}`
 }
 
 function generating(project) {
@@ -276,7 +278,7 @@ function generating(project) {
       <progress id="progress-meter" max="100" ${inProgress && Number.isFinite(current?.pct) ? `value="${current.pct}"` : inProgress ? "" : `value="${hasPreview ? 100 : 0}"`}></progress>
       <img class="progress-art" src="/studio-progress.webp" alt="">
       <ul class="stage-list">${[["Roteiro", project?.roteiro?.roteiro], ["Narração", project?.audio], ["Animação e prévia", hasPreview]].map(([stage, done]) => `<li data-done="${Boolean(done)}"><span aria-hidden="true">${done ? "✓" : "○"}</span>${stage}<small>${done ? "Pronto" : "Pendente"}</small></li>`).join("")}</ul>
-      ${project?.urls?.audio ? `<audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>` : ""}
+      ${project?.urls?.audio ? `<audio controls preload="metadata" src="${html(project.urls.audio)}"></audio>${hosted ? `<a class="text-link" href="${html(project.urls.audio)}" download="narracao.wav">Baixar narração WAV</a>` : ""}` : ""}
       ${!inProgress && project ? `<div class="actions">${link(hasPreview ? "revisao" : "criar", hasPreview ? "Abrir revisão" : "Voltar ao roteiro", project.id)}</div>` : ""}
     </div><aside class="surface production-preview"><div class="workspace-panel-title"><h2>Prévia do vídeo</h2></div>
     ${hasPreview ? `<div class="poster-stage"><video class="portrait" controls playsinline preload="metadata" src="${html(videoUrl(project, version(project)))}"></video></div>` : '<div class="poster-stage pending-preview"><span class="empty-mark" aria-hidden="true">▶</span><p>A prévia aparece quando estiver pronta.</p></div>'}</aside></div>`
@@ -389,6 +391,7 @@ function redraw(page, project, pending) {
   }
   content.innerHTML = (pages[page] || home)()
   content.setAttribute("aria-busy", "false")
+  if (hosted && page === "canais") content.insertAdjacentHTML("beforeend", '<div class="actions"><a class="button" href="/painel.html#integracoes">Integração com o YouTube</a></div>')
   if (page === "criar") { restoreDraft(project); loadVoiceLibrary(project) }
   for (const field of content.querySelectorAll(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
   if (workspace) bindReview()
@@ -643,7 +646,7 @@ content.addEventListener("submit", (event) => {
       if (["produce", "animate", "audio"].includes(intent) && !roteiro) throw new Error("Escreva, cole ou gere o roteiro primeiro.")
       const next = project || (await api("/projetos", { idea: titulo, duration: Number(data.duration) || 60, manual: true, channelId: cache.activeId, pautaId:data.pautaId })).project
       if (intent === "save") {
-        await projectApi(next, "roteiro", { titulo, roteiro })
+        await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId })
         localStorage.removeItem(draftKey(project))
         go("criar", next.id)
         return
@@ -651,7 +654,7 @@ content.addEventListener("submit", (event) => {
       if (intent === "animate" && (roteiro !== next.roteiro.roteiro || titulo !== next.titulo || (next.voice && data.voice !== next.voice))) {
         throw new Error("Gere uma nova narração para aplicar as mudanças de título, voz ou roteiro.")
       }
-      if (!next.audio) await projectApi(next, "roteiro", { titulo, roteiro })
+      if (!next.audio) await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId })
       go("gerando", next.id)
       try {
         const narrated = intent === "animate" ? next : await jobResult(await projectApi(next, "narracao", { titulo, roteiro, voice: data.voice, descricao: next.roteiro?.descricao }))

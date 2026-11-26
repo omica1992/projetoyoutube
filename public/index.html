@@ -1,24 +1,16 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-runtime="cloud">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101318">
+  <meta name="theme-color" content="#f6f4ee">
   <title>Studio 3D</title>
-  <link rel="stylesheet" href="/studio-ui.css">
+  <link rel="stylesheet" href="/studio-ui.css?v=cloud-1">
+  <script type="module" src="/studio-ui.js?v=cloud-1"></script>
 </head>
 <body>
-  <header class="header"><div class="header-inner"><span class="studio-mark" aria-hidden="true"><span></span></span><strong>Studio 3D</strong><a class="provider" href="/painel.html">Painel FatoNexo</a></div></header>
-  <main class="shell">
-    <section class="channel-hero surface">
-      <img class="hero-scene" src="/studio-banner.webp" alt="">
-      <div class="hero-identity"><div><p>Produção de Shorts</p><h1>Studio 3D</h1></div></div>
-    </section>
-    <div class="section-heading studio-section"><h2>Abrir o estúdio de produção</h2></div>
-    <section class="surface planning-card">
-      <p>Seus projetos, canais e o motor de animação ficam no computador que executa o Studio. Acesse por esse computador para criar roteiros, revisar cenas e baixar o MP4.</p>
-      <div class="actions"><a class="button" href="http://localhost:5173/#inicio">Abrir Studio neste computador</a><a class="button secondary" href="http://localhost:5173/#projetos">Meus projetos</a></div>
-    </section>
-  </main>
+  <header id="header" class="header"></header>
+  <main id="content" class="shell" aria-busy="true"><p>Carregando o Studioâ€¦</p></main>
+  <div id="status" class="feedback" role="status" aria-live="polite" hidden></div>
 </body>
 </html>
