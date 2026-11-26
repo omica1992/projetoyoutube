@@ -988,12 +988,145 @@ function welcomeNode() {
   return box
 }
 
+async function pollStudioJob(jobId, onProgress) {
+  for (;;) {
+    const job = await apiJson(`/api/jobs/${encodeURIComponent(jobId)}`)
+    onProgress?.(job)
+    if (job.status === "error" || job.status === "failed") throw new Error(job.error || "A operação falhou.")
+    if (job.status === "done" || job.status === "complete" || job.status === "completed") {
+      if (!job.result?.project) throw new Error("Operação finalizada sem projeto.")
+      return job.result.project
+    }
+    await new Promise((r) => setTimeout(r, 1200))
+  }
+}
+
+function renderChatVideoResult(box, proj) {
+  const ver = proj?.versions?.find((v) => v.id === proj.selectedVersion)
+  const mp4Url = proj?.urls?.mp4
+  const previewUrl = ver ? `/p/${encodeURIComponent(proj.id)}/${encodeURIComponent(ver.preview)}` : ""
+  const mediaUrl = mp4Url || previewUrl
+  if (!mediaUrl) return
+  box.replaceChildren()
+  const video = document.createElement("video")
+  video.controls = true
+  video.playsInline = true
+  video.preload = "metadata"
+  video.src = mediaUrl
+  video.className = "chat-video-preview"
+  const links = el("div", "", "actions")
+  const dl = extLink(mp4Url ? "Baixar MP4 final" : "Baixar prévia MP4", mediaUrl, "primary")
+  dl.removeAttribute("target")
+  dl.setAttribute("download", `${proj.id}.mp4`)
+  const rev = btn("Abrir na Revisão", () => openWorkspace(`revisao/${encodeURIComponent(proj.id)}`, true), "ghost", "film")
+  links.append(dl, rev)
+  box.append(video, links)
+}
+
 function actionCard(m) {
   const act = m.panelAction
   if (!act) return null
   const card = el("div", "", "chat-action-card")
   const label = el("span")
-  if (act.action === "editar_projeto" && act.patch) {
+  if (act.action === "criar_video_completo" && act.roteiro) {
+    const style = act.estilo || "3d"
+    const provider = act.provedorVoz === "elevenlabs" ? "elevenlabs" : "google"
+    label.append(icon("film"), document.createTextNode(`Criar vídeo (${style} · ${provider}): “${act.titulo || "Novo vídeo"}”`))
+    const progressEl = el("p", "", "meta")
+    const resultBox = el("div", "", "chat-video-result")
+    const runBtn = btn("Gerar narração, animação e MP4", async () => {
+      runBtn.disabled = true
+      try {
+        progressEl.textContent = "1/4 Criando projeto no Studio…"
+        const created = await jsonPost("/api/criar/projetos", {
+          manual: true,
+          idea: act.titulo || "Novo vídeo",
+          duration: Number(act.duracao) || 45,
+          style,
+          ttsProvider: provider,
+          channelId: currentChatChannel() === primaryChannelId ? null : currentChatChannel(),
+        })
+        let proj = created.project
+        progressEl.textContent = `2/4 Gerando narração (${provider})…`
+        const voice = act.voz || (provider === "elevenlabs" ? "pNInz6obpgDQGcFmaJgB" : "Kore")
+        const narJob = await jsonPost(`/api/criar/projetos/${encodeURIComponent(proj.id)}/narracao`, {
+          titulo: act.titulo || proj.titulo,
+          roteiro: act.roteiro,
+          voice,
+          ttsProvider: provider,
+        })
+        proj = await pollStudioJob(narJob.jobId, (j) => { progressEl.textContent = `2/4 ${j.step || "Narrando"} (${Math.round(j.pct || 0)}%)` })
+        progressEl.textContent = `3/4 Criando animação (${style})…`
+        const animJob = await jsonPost(`/api/criar/projetos/${encodeURIComponent(proj.id)}/animacao`, {
+          model: "opencode-go/kimi-k3",
+          style,
+        })
+        proj = await pollStudioJob(animJob.jobId, (j) => { progressEl.textContent = `3/4 ${j.step || "Animando"} (${Math.round(j.pct || 0)}%)` })
+        progressEl.textContent = "4/4 Convertendo em MP4 final…"
+        const expRes = await jsonPost(`/api/criar/projetos/${encodeURIComponent(proj.id)}/exportar`, {})
+        proj = expRes.project || await pollStudioJob(expRes.jobId, (j) => { progressEl.textContent = `4/4 ${j.step || "Exportando MP4"} (${Math.round(j.pct || 0)}%)` })
+        progressEl.textContent = "Vídeo MP4 pronto para download!"
+        renderChatVideoResult(resultBox, proj)
+        await loadChatProjects()
+        if ($("#chat-project")) $("#chat-project").value = proj.id
+        toast("Vídeo criado e convertido em MP4!")
+      } catch (error) {
+        progressEl.textContent = `Erro: ${error.message}`
+        toast(error.message, "error")
+        runBtn.disabled = false
+      }
+    }, "primary", "play")
+    card.append(label, runBtn, progressEl, resultBox)
+  } else if (act.action === "corrigir_cena_video" && act.pedido) {
+    const pid = act.projectId || $("#chat-project")?.value
+    const cena = Math.max(1, Number(act.cena) || 1)
+    label.append(icon("sparkles"), document.createTextNode(`Corrigir Cena ${cena}: “${act.pedido.slice(0, 80)}”`))
+    const progressEl = el("p", "", "meta")
+    const resultBox = el("div", "", "chat-video-result")
+    const runBtn = btn("Aplicar correção e re-renderizar", async () => {
+      if (!pid) return toast("Selecione um projeto no topo do chat primeiro.", "error")
+      runBtn.disabled = true
+      try {
+        progressEl.textContent = `Ajustando Cena ${cena}…`
+        const job = await jsonPost(`/api/criar/projetos/${encodeURIComponent(pid)}/chat`, {
+          scene: cena - 1,
+          message: act.pedido,
+          model: "opencode-go/kimi-k3",
+        })
+        const proj = await pollStudioJob(job.jobId, (j) => { progressEl.textContent = `${j.step || "Renderizando"} (${Math.round(j.pct || 0)}%)` })
+        progressEl.textContent = "Nova prévia renderizada!"
+        renderChatVideoResult(resultBox, proj)
+        toast("Cena corrigida!")
+      } catch (error) {
+        progressEl.textContent = `Erro: ${error.message}`
+        toast(error.message, "error")
+        runBtn.disabled = false
+      }
+    }, "primary", "refresh")
+    card.append(label, runBtn, progressEl, resultBox)
+  } else if (act.action === "exportar_mp4") {
+    const pid = act.projectId || $("#chat-project")?.value
+    label.append(icon("download"), document.createTextNode(`Converter “${act.title || "projeto"}” em MP4 final`))
+    const progressEl = el("p", "", "meta")
+    const resultBox = el("div", "", "chat-video-result")
+    const runBtn = btn("Converter e baixar MP4", async () => {
+      if (!pid) return toast("Selecione um projeto no topo do chat primeiro.", "error")
+      runBtn.disabled = true
+      try {
+        progressEl.textContent = "Renderizando MP4 final…"
+        const res = await jsonPost(`/api/criar/projetos/${encodeURIComponent(pid)}/exportar`, {})
+        const proj = res.project || await pollStudioJob(res.jobId, (j) => { progressEl.textContent = `${j.step || "Exportando"} (${Math.round(j.pct || 0)}%)` })
+        progressEl.textContent = "MP4 pronto!"
+        renderChatVideoResult(resultBox, proj)
+        toast("MP4 pronto para download!")
+      } catch (error) {
+        progressEl.textContent = `Erro: ${error.message}`
+        toast(error.message, "error")
+        runBtn.disabled = false
+      }
+    }, "primary", "download")
+    card.append(label, runBtn, progressEl, resultBox)
+  } else if (act.action === "editar_projeto" && act.patch) {
     label.textContent = `Alterações propostas em “${act.title}”`
     const preview = el("details", "", "chat-edit-preview")
     preview.append(el("summary", "Revisar alterações"))

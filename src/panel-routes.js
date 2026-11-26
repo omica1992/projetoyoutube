@@ -1371,6 +1371,12 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
      {"action":"criar_pauta","title":"...","promise":"...","context":"...","payoff":"..."}
    - Gerar/criar imagem (capa, cena, ilustração via Gemini):
      {"action":"gerar_imagem","prompt":"descrição visual detalhada em inglês ou português"}
+   - Criar vídeo completo (cria projeto, narração, animação 3D ou 2D/B1–B8 e exporta MP4 para download):
+     {"action":"criar_video_completo","titulo":"...","roteiro":"texto completo da narração (com tags [whispers]/[excited] se provedorVoz for elevenlabs)","estilo":"3d|2d-palito|b1|b2|b3|b4|b5|b6|b7|b8","provedorVoz":"google|elevenlabs","duracao":45}
+   - Corrigir cena da animação do projeto selecionado (e gerar nova prévia/MP4):
+     {"action":"corrigir_cena_video","cena":1,"pedido":"descrição clara do ajuste na cena"}
+   - Converter/exportar o projeto selecionado em MP4 final para download:
+     {"action":"exportar_mp4"}
    Use no máximo UM bloco studio-action por resposta. Não use tabelas Markdown largas; prefira listas.`
 
     const models = pickModels(req.body?.model)
@@ -1437,8 +1443,10 @@ ${project ? `Se pedirem para alterar o projeto selecionado, proponha as mudança
             await writeConcorrentes(list)
           }
           panelAction = { ...parsed, added: ch }
-        } else if (["buscar", "analisar_video", "criar_pauta"].includes(parsed?.action)) {
+        } else if (["buscar", "analisar_video", "criar_pauta", "criar_video_completo"].includes(parsed?.action)) {
           panelAction = parsed
+        } else if (["corrigir_cena_video", "exportar_mp4"].includes(parsed?.action) && project) {
+          panelAction = { ...parsed, projectId: project.id, title: project.titulo }
         } else if (parsed?.action === "gerar_imagem" && parsed.prompt) {
           try {
             const img = await generateChatImage({ prompt: parsed.prompt, outDir: chatUploadDir })
