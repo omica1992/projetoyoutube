@@ -40,12 +40,16 @@ if (!process.env.VERCEL) {
   app.use((req, res, next) => {
     const origin = studioRequestOrigin(req)
     if (!origin) return res.sendStatus(403)
-    if (origin.startsWith("https:") && !/^(?:\/$|\/(?:criar|editor)\.html$|\/studio(?:\.html|-ui\.(?:js|css)|-kit-preview\.jpg|-(?:banner|concept|progress)\.webp)$|\/api\/criar(?:\/|$)|\/api\/jobs\/|\/api\/youtube\/oauth\/(?:start|callback)$|\/p\/fdn-)/.test(req.path)) {
+    if (origin.startsWith("https:") && !/^(?:\/$|\/(?:criar|editor)\.html$|\/kit-render\.html$|\/kit\/|\/studio-(?:render|media)\.js$|\/studio(?:\.html|-ui\.(?:js|css)|-kit-preview\.jpg|-(?:banner|concept|progress)\.webp)$|\/api\/criar(?:\/|$)|\/api\/jobs\/|\/api\/painel\/studio\/plano$|\/api\/youtube\/oauth\/(?:start|callback)$|\/p\/fdn-)/.test(req.path)) {
       return res.sendStatus(404)
     }
     next()
   })
   app.get(["/", "/index.html", "/criar.html", "/studio.html", "/editor.html"], (req, res, next) => {
+    // Permite abrir a interface hospedada localmente para testar o modo nuvem.
+    if (req.query.cloud === "1" && req.path === "/editor.html") {
+      return res.set("Cache-Control", "no-store").sendFile(path.join(PUBLIC_DIR, "editor.html"))
+    }
     const proxy = studioRequestOrigin(req)?.startsWith("https:")
     if (!proxy && ["/", "/index.html", "/criar.html"].includes(req.path)) {
       res.set("Cache-Control", "no-store")

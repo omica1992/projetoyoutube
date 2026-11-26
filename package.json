@@ -6,12 +6,16 @@
   "description": "Estudio de producao de Shorts: roteiro -> audio -> HTML cinematografico -> MP4",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "build": "node scripts/sync-kit.mjs",
+    "prestart": "node scripts/sync-kit.mjs",
+    "sync-kit": "node scripts/sync-kit.mjs"
   },
   "dependencies": {
     "@opencode/client": "^2.3.0",
     "express": "^4.21.2",
     "ffmpeg-static": "^5.2.0",
+    "mediabunny": "1.66.4",
     "multer": "^1.4.5-lts.1",
     "puppeteer-core": "^23.11.1"
   }

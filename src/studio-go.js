@@ -35,7 +35,7 @@ export async function goModels() {
   return catalog
 }
 
-export async function askStudioGo({ model, text, image }) {
+export async function askStudioGo({ model, text, image, timeoutMs = 300_000 }) {
   const id = modelId(model)
   if (!id) throw new Error("Escolha um modelo do OpenCode Go.")
   const key = await goKey()
@@ -45,7 +45,7 @@ export async function askStudioGo({ model, text, image }) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "x-opencode-session": randomUUID() },
     body: JSON.stringify({ model: id, messages: [{ role: "user", content }] }),
-    signal: AbortSignal.timeout(300_000),
+    signal: AbortSignal.timeout(timeoutMs),
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(`OpenCode Go (${response.status}): ${data.error?.message || "não foi possível executar o modelo"}`)

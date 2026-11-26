@@ -8,7 +8,7 @@ import { isLocalStudio } from "./create-routes.js"
 import { cloudBook, editCloudBook } from "./cloud-book.js"
 import { loadCloudKit } from "./cloud-kit.js"
 import { goKey, goModels, validGoModel } from "./studio-go.js"
-import { planBrowserVideo } from "./video-kit.js"
+import { planBrowserOutline, planBrowserScene, planBrowserVideo } from "./video-kit.js"
 import multer from "multer"
 import { DATA_DIR, MODELS } from "./config.js"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
@@ -241,6 +241,63 @@ panelRoutes.post("/studio/plano", route(async (req, res) => {
   if (words.length < 3) return res.status(400).json({ error: "A sincronização de palavras está vazia." })
   const storyboard = await planBrowserVideo({ model, title, script, duration, words })
   res.json({ storyboard })
+}))
+panelRoutes.post("/studio/plano/esboco", route(async (req, res) => {
+  const title = String(req.body?.titulo || "").trim().slice(0, 100)
+  const script = String(req.body?.roteiro || "").trim().slice(0, 5000)
+  const duration = Number(req.body?.duracao)
+  const model = String(req.body?.model || "")
+  if (!title || !script) return res.status(400).json({ error: "Informe o título e o roteiro." })
+  if (!(duration > 5 && duration <= 180)) return res.status(400).json({ error: "Duração inválida para o vídeo." })
+  if (!validGoModel(model)) return res.status(400).json({ error: "Escolha um modelo válido para planejar a animação." })
+  if (!Array.isArray(req.body?.palavras) || !req.body.palavras.length || req.body.palavras.length > 4000) {
+    return res.status(400).json({ error: "Envie a sincronização das palavras da narração." })
+  }
+  const words = req.body.palavras.map((word) => ({
+    palavra: String(word?.palavra || "").trim().slice(0, 80),
+    inicio: Number(word?.inicio),
+    fim: Number(word?.fim),
+  })).filter((word) => word.palavra && Number.isFinite(word.inicio) && Number.isFinite(word.fim) && word.fim > word.inicio)
+  if (words.length < 3) return res.status(400).json({ error: "A sincronização de palavras está vazia." })
+  const outline = await planBrowserOutline({ model, title, script, duration, words })
+  res.json({ outline })
+}))
+panelRoutes.post("/studio/plano/cena", route(async (req, res) => {
+  const model = String(req.body?.model || "")
+  if (!validGoModel(model)) return res.status(400).json({ error: "Escolha um modelo válido para planejar a animação." })
+  const outline = req.body?.esboco
+  const start = Number(outline?.inicio)
+  const end = Number(outline?.fim)
+  const total = Number(req.body?.duracao)
+  const index = Number(req.body?.indice)
+  const count = Number(req.body?.totalCenas)
+  if (!outline || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return res.status(400).json({ error: "O esboço da cena está inválido." })
+  }
+  if (!(total > 0) || !Number.isInteger(index) || index < 0 || !Number.isInteger(count) || count < 1) {
+    return res.status(400).json({ error: "Os dados da cena estão incompletos." })
+  }
+  if (!Array.isArray(req.body?.palavras) || req.body.palavras.length > 4000) {
+    return res.status(400).json({ error: "Envie as palavras da cena." })
+  }
+  const words = req.body.palavras.map((word) => ({
+    palavra: String(word?.palavra || "").trim().slice(0, 80),
+    inicio: Number(word?.inicio),
+    fim: Number(word?.fim),
+  })).filter((word) => word.palavra && Number.isFinite(word.inicio) && Number.isFinite(word.fim) && word.fim > word.inicio)
+  const ambiente = req.body?.ambiente && typeof req.body.ambiente === "object" ? req.body.ambiente : {}
+  const cena = await planBrowserScene({
+    model,
+    outline: { ...outline, inicio: start, fim: end },
+    previous: req.body?.anterior || null,
+    next: req.body?.proximo || null,
+    words,
+    ambiente,
+    total,
+    index,
+    count,
+  })
+  res.json({ cena })
 }))
 panelRoutes.get("/studio/vozes", route(async (_req,res) => res.json((await googleVoices(await providerKey("gemini"))).filter(v=>!/^voice(?:key)?_/.test(v.id)))))
 panelRoutes.get("/studio/perfil-canal", route(async (req, res) => {

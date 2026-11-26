@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Renderização 3D</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/kit/engine/player.css">
+<style>
+  /* O palco real fica fora da tela; a exportação desenha o canvas + as
+     camadas de texto num canvas 2D próprio. */
+  html, body { background: #111; }
+  #palco { position: fixed; left: -12000px; top: 0; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "/kit/vendor/three.module.js",
+  "three/addons/": "/kit/vendor/addons/"
+} }
+</script>
+</head>
+<body>
+<div id="palco">
+  <canvas id="tela"></canvas>
+  <div id="camadas">
+    <div id="elementos"></div>
+    <div id="textos"></div>
+    <div id="legenda"></div>
+    <div id="fx"></div>
+  </div>
+</div>
+<script type="module" src="/kit/render.js"></script>
+</body>
+</html>

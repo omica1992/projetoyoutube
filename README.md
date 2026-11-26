@@ -6,12 +6,27 @@ Estúdio local para criar Shorts animados, revisar cenas e exportar em MP4. Os p
 
 Rode `npm start` na pasta `studio` e abra <http://localhost:5173>. Na primeira execução, instale as dependências do kit com `npm install` na pasta `kit-video-3d WillianIA`. A renderização usa Chrome, Edge ou Brave e o FFmpeg do Studio. A sincronização usa o Python com `faster-whisper`.
 
+## Renderização 3D na versão hospedada
+
+Na Vercel não existe Chrome nem FFmpeg no servidor. Por isso, a versão publicada usa o mesmo motor do kit de um jeito diferente: o servidor só planeja as cenas com a IA; o desenho dos quadros e a codificação do MP4 acontecem no navegador com WebCodecs + Mediabunny.
+
+- Funciona em Chrome ou Edge atualizados, no computador (recomendado) ou no celular.
+- Use **Renderizar animação 3D** depois de gerar a narração. O botão **Gerar narração e animação** faz as duas etapas.
+- O vídeo final tem 1080 × 1920 a 30 fps e é salvo no IndexedDB **deste navegador**. Ele aparece na biblioteca local do projeto e pode ser baixado em MP4.
+- A prévia rápida gera 540 × 960 a 24 fps e não é salva no projeto.
+- Limpar os dados do site remove os vídeos renderizados. Para guardar, baixe o MP4.
+- O planejamento usa o modelo escolhido em **IA da animação** e é feito em partes (um esboço e uma chamada por cena), para cada requisição ficar abaixo do limite da Vercel. Pode levar alguns minutos; a renderização completa depende do computador.
+
+Ao atualizar o kit 3D, rode `npm run sync-kit` para copiar motor, assets e Three.js para `public/kit`. O `npm start` e o build da Vercel também fazem essa cópia automaticamente.
+
 ## Produzir e publicar
 
 1. Abra **Criar vídeo**. Escreva ou cole o roteiro, ou informe um tema e escolha um modelo do OpenCode Go para gerar o texto. Configure `OPENCODE_GO_API_KEY` no ambiente do servidor.
 2. Escolha a voz do Gemini e o modelo do OpenCode Go para planejar a animação. O Studio reutiliza a chave Gemini configurada em Integrações. O kit valida o storyboard e gera a prévia vertical com narração e legendas.
 3. Na revisão, selecione uma cena ou pause o vídeo no ponto que quer mudar. Use o chat para pedir o ajuste. O Studio salva uma nova prévia e conserva as anteriores para comparação.
 4. Exporte a versão escolhida em 1080 × 1920 a 30 fps. Baixe o MP4 ou confirme o canal, título, descrição e visibilidade antes de enviar ao YouTube.
+
+> Na versão hospedada, a edição por chat e o envio direto ao YouTube ainda não estão disponíveis. O vídeo é renderizado no navegador e fica disponível para download; publique pelo YouTube Studio.
 
 Em **Meus canais**, use **Conectar canal** para autorizar uma conta Google e confirmar o canal retornado pelo YouTube. O seletor do cabeçalho muda o canal ativo, a imagem e a lista de projetos. O Studio usa o arquivo de autorização legado do Fora do Nível quando ele está presente e guarda autorizações adicionais separadamente por canal. Esses arquivos ficam fora da pasta pública e do Git. Cadastre `http://localhost:5173/api/youtube/oauth/callback` no cliente OAuth do Google.
 

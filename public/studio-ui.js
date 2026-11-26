@@ -29,13 +29,43 @@ function studioNav() {
 }
 
 async function api(url, payload) {
-  if (hosted) return (await import("/studio-cloud.js")).cloudApi(url,payload)
+  if (hosted) return (await import("/studio-cloud.js?v=cloud-9")).cloudApi(url,payload)
   const response = await fetch(url.startsWith("/api/") ? url : apiRoot + url, payload === undefined ? {} : {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
   })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(data.error || `A operação falhou (HTTP ${response.status}).`)
   return data
+}
+
+async function startBrowserRender(project, model) {
+  if (!hosted) return
+  const [{ cloudAudioBlob }, { renderProject }] = await Promise.all([
+    import("/studio-cloud.js?v=cloud-9"),
+    import("/studio-render.js?v=cloud-9"),
+  ])
+  const audioBlob = cloudAudioBlob(project.id)
+  if (!audioBlob) throw new Error("A narração deste projeto não está mais disponível. Gere a narração novamente neste navegador.")
+  await renderProject({
+    project,
+    audioBlob,
+    model,
+    onSaved: async ({ saved }) => {
+      if (!saved) return
+      const { getVideoUrl } = await import("/studio-media.js?v=cloud-9")
+      const url = await getVideoUrl(project.id)
+      if (url && cache.current?.id === project.id) {
+        cache.current = {
+          ...cache.current,
+          urls: { ...(cache.current.urls || {}), mp4: url },
+          mp4: "browser",
+          browserVideo: true,
+        }
+        if (route()[0] === "criar" && route()[1] === project.id) redraw("criar", cache.current)
+      }
+      notify("Vídeo salvo neste navegador. Baixe o MP4 ou abra o projeto.")
+    },
+  })
 }
 
 function notify(message, error = false) {
@@ -60,7 +90,7 @@ function headerView(project = null) {
   header.classList.toggle("workspace-header", review)
   const brand = channel ? avatar(channel) : '<span class="studio-mark" aria-hidden="true"><span></span></span>'
   const download = project?.urls.mp4
-    ? `<a class="button workspace-export" href="${html(project.urls.mp4)}" download><span aria-hidden="true">↓</span> Baixar MP4</a>`
+    ? `<a class="button workspace-export" href="${html(project.urls.mp4)}" download="${html(project.titulo || "video")}.mp4"><span aria-hidden="true">↓</span> Baixar MP4</a>`
     : project ? link("exportar", "Exportar vídeo", project.id, "button workspace-export") : ""
   if (embedded) {
     header.hidden = !project
@@ -301,7 +331,7 @@ function create(project) {
   const hasVideo = Boolean(version(project) || project?.urls?.mp4)
   return `${heading(project ? "Editar roteiro" : "Criar vídeo")}
     ${!config.go ? '<p class="notice">A chave do OpenCode Go ainda não está configurada no servidor.</p>' : ""}
-    ${!config.kit ? `<p class="notice">${hosted ? "A renderização de animações 3D ainda não está disponível nesta hospedagem." : "O motor 3D precisa das dependências do kit para gerar as cenas."}</p>` : ""}
+    ${!config.kit && !config.browserRender ? `<p class="notice">${hosted ? "A renderização de animações 3D ainda não está disponível nesta hospedagem." : "O motor 3D precisa das dependências do kit para gerar as cenas."}</p>` : ""}
     <div class="production-grid create-grid"><form id="create-form" class="surface form production-form">
       ${project?.id ? "" : `<div class="script-start">
         <label>Tema para a IA<input name="idea" placeholder="Escolha um tema ou escreva uma ideia" maxlength="2000"></label>
@@ -316,7 +346,7 @@ function create(project) {
       <details class="production-settings"><summary><span>Configurações de produção</span><span id="settings-summary" class="settings-summary"></span></summary>
         <div class="fields">
           ${project?.id ? "" : `<label>Duração alvo<select name="duration">${opts}</select></label>${modelOptions("IA do roteiro", "scriptModel", null, "opencode-go/deepseek-v4.1-flash")}`}
-          ${modelOptions("IA da animação", "animationModel", project?.animationModel, "opencode-go/kimi-k3")}
+          ${modelOptions("IA da animação", "animationModel", project?.animationModel, hosted ? "opencode-go/deepseek-v4.1-flash" : "opencode-go/kimi-k3")}
           <div class="voice-settings"><label>Buscar voz do Google<input id="voice-search" type="search" placeholder="Nome ou idioma, ex.: Arlo, pt-BR"></label><label>Voz<select name="voice">${voices}</select></label><small id="voice-count" aria-live="polite">${config.gemini ? "Carregando biblioteca…" : "Vozes locais"}</small></div>
         </div>
       </details>
@@ -325,7 +355,8 @@ function create(project) {
       <small class="draft-status" role="status"></small><div class="actions production-actions">
         <button class="button" name="intent" value="audio" ${!config.gemini || project?.publicacao ? "disabled" : ""}>Gerar narração</button>
         ${!hosted && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="animate" ${!config.go || !config.kit ? "disabled" : ""}>Aprovar áudio e planejar cenas</button>` : ""}
-        <button class="button secondary" name="intent" value="produce" ${!config.go || !config.gemini || !config.kit || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
+        ${hosted && config.browserRender && project?.audio && !project.publicacao ? `<button class="button secondary" name="intent" value="render3d" ${!config.go ? "disabled" : ""}>Renderizar animação 3D</button>` : ""}
+        <button class="button secondary" name="intent" value="produce" ${!config.go || !config.gemini || (!config.kit && !config.browserRender) || project?.publicacao ? "disabled" : ""}>Gerar narração e animação</button>
         <button class="button secondary" name="intent" value="save">Salvar roteiro</button>
         ${embedded && hosted ? '<a class="text-link" href="/#pacote" target="_top">Pacote de edição</a>' : ""}
       </div>
@@ -374,8 +405,9 @@ function review(project) {
     ${item ? `<div class="review-scenes"><div class="scene-heading"><h3>Cenas</h3><span id="active-scene-label"></span></div><div class="scene-list" aria-label="Cenas">${item.scenes.map((scene, index) => `<button type="button" data-action="seek" data-id="${scene.inicio}"><span class="scene-frame" aria-hidden="true"></span><strong>Cena ${index + 1}</strong><span>${clock(scene.inicio)}</span></button>`).join("")}</div></div>` : '<div class="review-file-details"><span>Vídeo vertical</span><span>MP4 original</span></div>'}
     ${project.versions?.length > 1 || project.urls.mp4 ? `<div class="review-actions">
       ${project.versions?.length > 1 ? link("comparar", "Comparar versões", project.id) : ""}
-      ${project.urls.mp4 ? link("publicar", "Publicar no YouTube", project.id, "text-link") : ""}
+      ${project.urls.mp4 && !hosted ? link("publicar", "Publicar no YouTube", project.id, "text-link") : ""}
     </div>` : ""}
+    ${project.browserVideo ? '<p class="notice">Renderizado neste navegador. Baixe o MP4 para publicar no YouTube.</p>' : ""}
   </section>
   <section class="surface chat"><div class="workspace-panel-title"><h2>Chat de edição</h2><div class="chat-model">${item ? modelOptions("Modelo", "chatModel", item.model, "opencode-go/kimi-k3") : ""}<span class="workspace-badge">OpenCode Go</span></div></div>
     <div class="messages${messages ? "" : " messages-empty"}" id="messages">${messages || `<div class="chat-empty"><span class="chat-empty-icon" aria-hidden="true">✦</span><h3>${item ? "Qual cena você quer ajustar?" : "Edição por cena"}</h3><p>${item ? "Selecione uma cena ou pause a prévia no ponto que quer ajustar. Você pode pedir mudanças de câmera, cenário e movimento." : "Este vídeo foi gerado no motor anterior. Para conversar com a IA sobre uma cena, gere uma prévia com o kit 3D usando sua narração atual."}</p>${!item && project.audio && !project.publicacao ? link("criar", "Abrir roteiro e narração", project.id) : ""}</div>`}</div>
@@ -415,8 +447,9 @@ function exportVideo(project) {
       <section class="form surface delivery-panel"><h2>Arquivo final</h2>
       ${media ? `<div class="file-card"><span class="empty-mark" aria-hidden="true">▤</span><div><strong>${html(project.titulo)}.mp4</strong><p>${project.urls.mp4 ? "Pronto para baixar" : "Aguardando renderização final"}</p></div></div>
       <dl class="file-specs"><div><dt>Formato</dt><dd>MP4 vertical</dd></div>${item ? "<div><dt>Resolução final</dt><dd>1080 × 1920 · 30 fps</dd></div>" : ""}</dl>` : ""}
-      ${project.urls.mp4 ? `<div class="actions"><a class="button" href="${html(project.urls.mp4)}" download>↓ Baixar MP4</a>${link("publicar", "Publicar no YouTube", project.id)}</div>`
-      : item ? '<button class="button" data-action="export">Gerar MP4 final</button>' : "<p>Gere uma prévia antes de exportar.</p>"}</section></div>`
+      ${project.urls.mp4 ? `<div class="actions"><a class="button" href="${html(project.urls.mp4)}" download="${html(project.titulo || "video")}.mp4">↓ Baixar MP4</a>${hosted ? "" : link("publicar", "Publicar no YouTube", project.id)}</div>`
+      : item ? '<button class="button" data-action="export">Gerar MP4 final</button>' : "<p>Gere uma prévia antes de exportar.</p>"}</section></div>
+      ${project.browserVideo ? '<p class="notice">Este vídeo foi renderizado neste navegador. Baixe o MP4 para publicar no YouTube.</p>' : ""}`
 }
 
 function deliveryPreview(media) {
@@ -428,6 +461,11 @@ function deliveryPreview(media) {
 function publicationLibrary() {
   const candidates = cache.projects.filter(p => !p.jobId && !p.publicacao && (p.urls?.mp4 || version(p)))
   const published = cache.projects.filter(p => p.publicacao)
+  if (hosted) {
+    return `${heading("Publicação", "O envio direto ao YouTube ainda não está disponível na hospedagem.")}
+      <div class="surface studio-empty"><span class="empty-mark" aria-hidden="true">▤</span><h2>Baixe o MP4 para publicar</h2><p>Renderize a animação no navegador, baixe o arquivo e publique pelo YouTube Studio.</p>
+      ${candidates.length ? `<div class="actions">${candidates.map(p => `<a class="button" href="${html(p.urls.mp4)}" download="${html(p.titulo || "video")}.mp4">Baixar ${html(p.titulo)}</a>`).join("")}</div>` : link("projetos", "Abrir projetos", "", "button")}</div>`
+  }
   return `${heading("Publicação", "Escolha um vídeo que você já criou no Studio.")}
     <div class="publication-layout"><section class="surface form publication-picker">
       <h2>Vídeo do projeto</h2>
@@ -459,6 +497,11 @@ function updatePublicationPreview(id) {
 function publish(project) {
   const channel = channelProject(project)
   const media = project.urls.mp4
+  if (hosted) {
+    return `${link("publicacao", "← Voltar à publicação", "", "text-link")}${heading("Publicação", "O envio direto ao YouTube ainda não está disponível na hospedagem.")}
+      <div class="surface studio-empty"><span class="empty-mark" aria-hidden="true">▤</span><h2>Publique pelo YouTube Studio</h2><p>Baixe o MP4 renderizado neste navegador e envie o arquivo manualmente.</p>
+      ${media ? `<div class="actions"><a class="button" href="${html(media)}" download="${html(project.titulo || "video")}.mp4">Baixar MP4</a>${link("revisao", "Voltar à revisão", project.id)}</div>` : link("projetos", "Abrir projetos", "", "button")}</div>`
+  }
   if (project.publicacao) {
     const id = project.publicacao.videoId || project.publicacao.id
     const scheduled = Date.parse(project.publicacao.publishAt) > Date.now()
@@ -785,6 +828,12 @@ content.addEventListener("submit", (event) => {
       const roteiro = data.script?.trim() || ""
       if (["produce", "animate", "audio"].includes(intent) && !roteiro) throw new Error("Escreva, cole ou gere o roteiro primeiro.")
       const next = project || (await api("/projetos", { idea: titulo, duration: Number(data.duration) || 60, manual: true, channelId: cache.activeId, pautaId:data.pautaId })).project
+      if (intent === "render3d") {
+        if (!next.audio) throw new Error("Gere a narração primeiro.")
+        if (roteiro !== next.roteiro?.roteiro || titulo !== next.titulo) throw new Error("Gere uma nova narração para aplicar mudanças no roteiro ou no título.")
+        await startBrowserRender(next, data.animationModel)
+        return
+      }
       if (intent === "save") {
         await projectApi(next, "roteiro", { titulo, roteiro, duration:next.duracaoAlvo, pautaId:next.pautaId, channelId:next.channelId })
         localStorage.removeItem(draftKey(project))
@@ -802,6 +851,12 @@ content.addEventListener("submit", (event) => {
         if (intent === "audio") { go("criar", narrated.id); return }
         cache.current = narrated
         if (route()[0] === "gerando") redraw("gerando", narrated)
+        if (hosted) {
+          if (!narrated.audio) throw new Error("A narração não ficou disponível neste navegador.")
+          go("criar", narrated.id)
+          await startBrowserRender(narrated, data.animationModel)
+          return
+        }
         const animated = await jobResult(await projectApi(narrated, intent === "animate" ? "plano" : "animacao", { model: data.animationModel }))
         go(intent === "animate" ? "criar" : "revisao", animated.id)
       } catch (error) { go("criar", next.id); throw error }
