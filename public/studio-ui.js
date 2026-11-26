@@ -306,7 +306,8 @@ function scriptMeterText(text) {
 
 function settingsSummaryText(form) {
   if (!form) return ""
-  const styleLabel = form.elements.style?.value === "2d-palito" ? "2D Palito" : "3D"
+  const s = form.elements.style?.value
+  const styleLabel = s === "3d" || !s ? "3D" : s === "2d-palito" ? "2D Palito" : s.toUpperCase()
   const dur = form.elements.duration?.value
   const voiceOpt = form.elements.voice?.selectedOptions?.[0]?.textContent?.split("·")[0]?.trim()
   const modelId = form.elements.animationModel?.value || ""
@@ -343,7 +344,15 @@ function create(project) {
         <label>Título<input name="title" maxlength="100" value="${html(project?.titulo)}" placeholder="Título do vídeo"></label>
         <label>Estilo da animação<select name="style">
           <option value="3d"${(project?.style || "3d") === "3d" ? " selected" : ""}>3D Explicativo (Low-Poly)</option>
-          <option value="2d-palito"${project?.style === "2d-palito" ? " selected" : ""}>2D Boneco de Palito (Nina, Beto, Léo)</option>
+          <option value="2d-palito"${project?.style === "2d-palito" ? " selected" : ""}>2D Boneco de Palito (Nina, Beto, Léo, Caio)</option>
+          <option value="b1"${project?.style === "b1" ? " selected" : ""}>B1 · Traço minimalista (papel &amp; lápis)</option>
+          <option value="b2"${project?.style === "b2" ? " selected" : ""}>B2 · Desenho à mão colorido</option>
+          <option value="b3"${project?.style === "b3" ? " selected" : ""}>B3 · TV retrô (CRT / mistério)</option>
+          <option value="b4"${project?.style === "b4" ? " selected" : ""}>B4 · Suspense de sobrevivência</option>
+          <option value="b5"${project?.style === "b5" ? " selected" : ""}>B5 · Explicação com personagem</option>
+          <option value="b6"${project?.style === "b6" ? " selected" : ""}>B6 · Meme dinâmico</option>
+          <option value="b7"${project?.style === "b7" ? " selected" : ""}>B7 · Teatro pixel (8-bit)</option>
+          <option value="b8"${project?.style === "b8" ? " selected" : ""}>B8 · Mitologia grega (papiro &amp; ouro)</option>
         </select></label>
       </div>
       <div class="story-editor-wrap">
