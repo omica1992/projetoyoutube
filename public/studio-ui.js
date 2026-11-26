@@ -268,11 +268,37 @@ async function loadVoiceLibrary(project) {
   }
 }
 
+function scriptMeterText(text) {
+  const words = (text || "").trim().split(/\s+/).filter(Boolean).length
+  const seconds = Math.round(words / 2.4)
+  return `${words} ${words === 1 ? "palavra" : "palavras"} · ~${seconds}s`
+}
+
+function settingsSummaryText(form) {
+  if (!form) return ""
+  const dur = form.elements.duration?.value
+  const voiceOpt = form.elements.voice?.selectedOptions?.[0]?.textContent?.split("·")[0]?.trim()
+  const modelId = form.elements.animationModel?.value || ""
+  const modelName = modelId.split("/").at(-1) || ""
+  return [dur ? `${dur}s` : "", voiceOpt, modelName].filter(Boolean).join(" · ")
+}
+
+function updateCreateMeta(form) {
+  if (!form) return
+  const meter = form.querySelector("#script-meter")
+  if (meter) meter.textContent = scriptMeterText(form.elements.script?.value)
+  const summary = form.querySelector("#settings-summary")
+  if (summary) summary.textContent = settingsSummaryText(form)
+}
+
 function create(project) {
   const config = cache.config
   const opts = [30, 45, 60, 90, 120, 150].map((seconds) => `<option value="${seconds}"${seconds === (project?.duracaoAlvo || 60) ? " selected" : ""}>${seconds} segundos</option>`).join("")
   const available = fullVoiceLibrary || config.voices
   const voices = (project?.voice && !available.some(v => v.id === project.voice) ? [...available,{id:project.voice,label:project.voice}] : available).map((voice) => `<option value="${html(voice.id)}"${(project?.voice || "en-us-arlo") === voice.id ? " selected" : ""}>${html(voice.label || voice.id)}</option>`).join("")
+  const hasScript = Boolean(project?.roteiro?.roteiro?.trim())
+  const hasAudio = Boolean(project?.audio)
+  const hasVideo = Boolean(version(project) || project?.urls?.mp4)
   return `${heading(project ? "Editar roteiro" : "Criar vídeo")}
     ${!config.go ? '<p class="notice">A chave do OpenCode Go ainda não está configurada no servidor.</p>' : ""}
     ${!config.kit ? `<p class="notice">${hosted ? "A renderização de animações 3D ainda não está disponível nesta hospedagem." : "O motor 3D precisa das dependências do kit para gerar as cenas."}</p>` : ""}
@@ -283,8 +309,11 @@ function create(project) {
         <div class="script-start-actions"><a class="text-link" href="#pautas">Sugerir temas com IA →</a><button class="button secondary" name="intent" value="script" ${!config.go ? "disabled" : ""}>Gerar roteiro</button></div>
       </div>`}
       <label>Título<input name="title" maxlength="100" value="${html(project?.titulo)}" placeholder="Título do vídeo"></label>
-      <label class="story-editor">Roteiro<textarea name="script" rows="12" maxlength="5000" placeholder="Escreva ou cole a narração…">${html(project?.roteiro?.roteiro)}</textarea></label>
-      <details class="production-settings"><summary>Configurações de produção</summary>
+      <div class="story-editor-wrap">
+        <div class="story-editor-head"><span>Roteiro</span><span id="script-meter" class="script-meter">${scriptMeterText(project?.roteiro?.roteiro)}</span></div>
+        <label class="story-editor"><span class="sr-only">Roteiro</span><textarea name="script" rows="12" maxlength="5000" placeholder="Escreva ou cole a narração…">${html(project?.roteiro?.roteiro)}</textarea></label>
+      </div>
+      <details class="production-settings"><summary><span>Configurações de produção</span><span id="settings-summary" class="settings-summary"></span></summary>
         <div class="fields">
           ${project?.id ? "" : `<label>Duração alvo<select name="duration">${opts}</select></label>${modelOptions("IA do roteiro", "scriptModel", null, "opencode-go/deepseek-v4.1-flash")}`}
           ${modelOptions("IA da animação", "animationModel", project?.animationModel, "opencode-go/kimi-k3")}
@@ -302,8 +331,13 @@ function create(project) {
       </div>
     </form><aside class="surface production-preview create-preview">
       <div class="workspace-panel-title"><h2>Prévia do projeto</h2><span class="workspace-badge">9:16</span></div>
-      ${version(project) || project?.urls?.mp4 ? `<div class="poster-stage cinema-stage"><video class="portrait" controls playsinline preload="metadata" src="${html(version(project) ? videoUrl(project, version(project)) : project.urls.mp4)}"></video></div>`
-      : `<div class="preview-awaiting"><span class="empty-mark" aria-hidden="true">▶</span><p>${project?.scenePlan ? "Confira o plano de cenas para gerar a prévia." : project?.audio ? "A narração está pronta. A prévia aparece depois que você gerar a animação." : "A prévia aparece depois que você gerar a animação deste projeto."}</p></div>
+      ${hasVideo ? `<div class="poster-stage cinema-stage"><video class="portrait" controls playsinline preload="metadata" src="${html(version(project) ? videoUrl(project, version(project)) : project.urls.mp4)}"></video></div>`
+      : `<div class="preview-awaiting"><span class="empty-mark" aria-hidden="true">▶</span><p>${project?.scenePlan ? "Confira o plano de cenas para gerar a prévia." : hasAudio ? "A narração está pronta. A prévia aparece depois que você gerar a animação." : "A prévia vertical (9:16) aparece aqui após gerar a animação."}</p>
+        <ul class="preview-checklist" aria-label="Progresso">
+          <li data-done="${hasScript}"><span>${hasScript ? "✓" : "1"}</span>Roteiro</li>
+          <li data-done="${hasAudio}"><span>${hasAudio ? "✓" : "2"}</span>Narração</li>
+          <li data-done="${hasVideo}"><span>${hasVideo ? "✓" : "3"}</span>Animação 3D</li>
+        </ul></div>
         <details class="visual-reference"><summary>Ver referência visual</summary><img src="/studio-concept.webp" alt="Ilustração de referência de um rolo compactador" loading="lazy"></details>`}
     </aside></div>${planView(project)}
     ${project?.htmlDocuments?.length ? `<details class="surface planning-card scene-plan"><summary>Versões do HTML do projeto</summary><ul class="idea-list">${[...project.htmlDocuments].reverse().map((version, index) =>
@@ -487,6 +521,7 @@ function redraw(page, project, pending) {
     sendToPanel("studio:mobile-action", canReview ? { intent: "review", label: "Revisar vídeo" } :
       next ? { intent: next.value, label: next.textContent.trim() } : null)
     loadVoiceLibrary(project)
+    updateCreateMeta(form)
   } else sendToPanel("studio:mobile-action", null)
   for (const field of content.querySelectorAll(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
   if (workspace) bindReview()
@@ -891,6 +926,7 @@ content.addEventListener("change", (event) => {
   if (field.name === "projectId" && field.form?.id === "publication-picker") updatePublicationPreview(field.value)
   if (field.id === "archived-projects") { cache.showArchived = field.checked; navigate() }
   if (field.matches(".model-field select")) field.closest(".model-field").querySelector(".model-info").innerHTML = modelInfo(field.value)
+  if (field.closest("#create-form")) updateCreateMeta(field.form)
   const project = cache.current
   if (field.name === "visibility") {
     const scheduled = field.value === "scheduled"
@@ -927,6 +963,7 @@ content.addEventListener("input", (event) => {
   if (event.target.closest("#create-form")) {
     const form = event.target.form
     saveDraft(form)
+    updateCreateMeta(form)
     sendToPanel("studio:fields", { title: form.elements.title.value, script: form.elements.script.value })
   }
   if (event.target.id !== "project-search") return

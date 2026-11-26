@@ -314,7 +314,7 @@ export function createRoutes({ projects, projectDir, publicProject, createJob, s
       progress(20, "Escrevendo títulos e narração")
       const generated = parseJsonLoose(await askStudioGo({
         model: scriptModel,
-        text: `Escreva um roteiro em português brasileiro de aproximadamente ${duration} segundos para um vídeo 3D explicativo. Use frases curtas, gancho e explicação visual, sem inventar dados. Retorne somente {"titulo":"","roteiro":"","descricao":""}. Tema: ${JSON.stringify(idea)}`,
+        text: `Escreva um roteiro em português brasileiro de aproximadamente ${duration} segundos para um vídeo 3D explicativo. Use frases curtas, gancho forte nos 3 primeiros segundos e explicação clara, sem inventar dados. O campo "roteiro" deve conter APENAS o texto exato que será falado na narração (sem rubricas, sem "Visual:", sem "Narrador:" e sem indicações entre parênteses ou colchetes). Retorne somente {"titulo":"","roteiro":"","descricao":""}. Tema: ${JSON.stringify(idea)}`,
       }))
       const roteiro = text(generated?.roteiro, 5000)
       if (!roteiro) throw new Error("O modelo não retornou um roteiro.")
