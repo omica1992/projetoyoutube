@@ -257,7 +257,7 @@ export const texPlanet = (THREE, tipo, seed) => ctex(THREE, `pl_${tipo}_${seed}`
 export const ELENCO = {
   silas: { jacket: "#2b5280", pants: "#2b3242", boots: "#241b16", skin: "#e7b084", hat: "beanie", cap: "#e24d2b", beard: "#6c4529", moustache: "#5a3820", seed: 2 },
   pedro: { jacket: "#3a6fd1", pants: "#33384a", boots: "#241b16", skin: "#f5cfa8", hat: "hair", hair: "#3a2a20", seed: 5 },
-  maria: { jacket: "#d9467a", pants: "#3b3f52", boots: "#3a2a20", skin: "#f7d4b2", hat: "hair", hair: "#6b3a22", seed: 8 },
+  maria: { jacket: "#d9467a", pants: "#3b3f52", boots: "#3a2a20", skin: "#f7d4b2", hat: "hair", hair: "#6b3a22", hairStyle: "long", seed: 8 },
   joao: { jacket: "#e09a2b", pants: "#3b5b9a", boots: "#241b16", skin: "#e8b98f", hat: "cap", cap: "#2e75b6", build: "adult", seed: 11 },
   extra: (v) => {
     const coats = ["#3f6fb5", "#c24444", "#5d7a3a", "#b5653f", "#7b5ac9", "#2f5f6a"]
@@ -372,7 +372,7 @@ const rotAbout = (q, a, c) => rotPts([q], a, c[0], c[1])[0]
 const taper = (p, a, b, wa, wb, col = INK) => {
   const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l
   p.poly([[a[0] + nx * wa / 2, a[1] + ny * wa / 2], [b[0] + nx * wb / 2, b[1] + ny * wb / 2],
-    [b[0] - nx * wb / 2, b[1] - ny * wb / 2], [a[0] - nx * wa / 2, a[1] - ny * wa / 2]], col, 0)
+  [b[0] - nx * wb / 2, b[1] - ny * wb / 2], [a[0] - nx * wa / 2, a[1] - ny * wa / 2]], col, 0)
   p.dot(a[0], a[1], wa / 2, col); p.dot(b[0], b[1], wb / 2, col)
 }
 
@@ -468,6 +468,7 @@ export const piscar = (t, seed) => {
 
 function drawHat(p, o, hp, H, cx, hc, light, seed, facing) {
   const W = 2 * H.a, HH = 2 * H.b, u = W / 100, crown = hc - H.b, ow = 0.85 * 5 * u
+  const thick = thickAngle(light)
   const a = H.rot + rad(3 * (rnd(seed, 20) - 0.5))
   const R = (pts) => rotPts(pts, a, cx, hc)
   if (o.hat === "beanie") {
@@ -475,56 +476,104 @@ function drawHat(p, o, hp, H, cx, hc, light, seed, facing) {
     const keep = (_x, y) => y < cut
     const n = hp.length, startIdx = Math.max(0, hp.findIndex(([x, y], i) => keep(x, y) && !keep(hp[(i + n - 1) % n][0], hp[(i + n - 1) % n][1])))
     const arc = [...hp.slice(startIdx), ...hp.slice(0, startIdx)].filter(([x, y]) => keep(x, y))
-      .map(([x, y]) => [cx + (x - cx) * 1.04, hc + (y - hc) * 1.04])
+      .map(([x, y]) => [cx + (x - cx) * 1.05, hc + (y - hc) * 1.05])
     if (arc.length >= 3) {
       p.shadedFill(arc, o.cap, mul(o.cap, SH_FELT), light, H.a, 0.35)
-      p.poly(arc, null, ow)
+      p.clip(arc, () => {
+        p.stroke([[cx - 26 * u, cut - 14 * u], [cx - 10 * u, crown + 6 * u]], 3.6 * u, "rgba(255,255,255,0.28)")
+        for (const ox of [-20, 0, 20]) p.stroke([[cx + ox * u, cut], [cx + ox * 0.7 * u, crown + 6 * u]], 1.4 * u, "rgba(36,23,38,0.25)")
+      })
+      p.inkRing(arc, ow, thick)
     }
     const [px, py] = R([[cx, cut + 1 * u]])[0]
-    p.ell(px, py, 48 * u, 7 * u, shade(o.cap, 1.05), ow, 0, 360, (a * 180) / Math.PI)
-    const [bx, by] = R([[cx, crown - 4 * u]])[0]
-    p.ell(bx, by, 9 * u, 9 * u, o.cap, ow)
+    const cuff = ellPts(px, py, 49 * u, 7.5 * u, 0, 360, (a * 180) / Math.PI)
+    p.shadedFill(cuff, shade(o.cap, 1.06), mul(o.cap, SH_FELT), light, 49 * u, 0.3)
+    p.inkRing(cuff, ow * 0.9, thick)
+    const [bx, by] = R([[cx, crown - 5.5 * u]])[0]
+    const pom = ellPts(bx, by, 10 * u, 10 * u)
+    p.shadedFill(pom, shade(o.cap, 1.08), mul(o.cap, SH_FELT), light, 10 * u, 0.35)
+    p.inkRing(pom, ow * 0.85, thick)
   } else if (o.hat === "cap" || o.hat === "hair") {
-    const cut = crown + (o.hat === "cap" ? 0.3 : 0.42) * HH
+    const cut = crown + (o.hat === "cap" ? 0.3 : 0.44) * HH
     const keep = (_x, y) => y < cut
     const n = hp.length, startIdx = Math.max(0, hp.findIndex(([x, y], i) => keep(x, y) && !keep(hp[(i + n - 1) % n][0], hp[(i + n - 1) % n][1])))
     const arc = [...hp.slice(startIdx), ...hp.slice(0, startIdx)].filter(([x, y]) => keep(x, y))
-      .map(([x, y]) => [cx + (x - cx) * 1.03, hc + (y - hc) * 1.03])
+      .map(([x, y]) => [cx + (x - cx) * (o.hat === "hair" ? 1.07 : 1.04), hc + (y - hc) * (o.hat === "hair" ? 1.08 : 1.04)])
     if (arc.length < 3) return
-    if (o.hat === "hair") {
-      const [x0, y0] = arc[arc.length - 1], [x1, y1] = arc[0]
-      for (let i = 1; i < 6; i++) arc.push([x0 + ((x1 - x0) * i) / 6, y0 + ((y1 - y0) * i) / 6 + (i % 2 ? 4.5 * u : 0)])
-    }
     const col = o.hat === "cap" ? o.cap : o.hair
-    p.shadedFill(arc, col, mul(col, SH_FELT), light, H.a, 0.35)
-    p.poly(arc, null, ow)
     if (o.hat === "hair") {
-      const s = facing || 1
-      p.stroke([[cx + s * 10 * u, cut - 30 * u], [cx + s * 2 * u, cut - 12 * u]], 1.3 * u)
+      // Cabelo longo (laterais/mechas descendo) quando hairStyle === "long"
+      if (o.hairStyle === "long") {
+        for (const side of [-1, 1]) {
+          const sx = cx + side * H.a * 0.92
+          const lock = [
+            ...curve([sx - side * 8 * u, cut - 4 * u], [sx + side * 14 * u, hc + 24 * u], [sx + side * 6 * u, hc + H.b + 28 * u], 12),
+            ...curve([sx + side * 6 * u, hc + H.b + 28 * u], [sx - side * 12 * u, hc + H.b + 20 * u], [sx - side * 14 * u, cut + 4 * u], 12),
+          ]
+          p.shadedFill(lock, col, mul(col, SH_FELT), light, H.a * 0.6, 0.3)
+          p.inkRing(lock, ow * 0.85, thick)
+        }
+      }
+      // Franja orgânica em onda suave
+      const [x0, y0] = arc[arc.length - 1], [x1, y1] = arc[0]
+      const bangs = []
+      const steps = 16
+      for (let i = 1; i < steps; i++) {
+        const f = i / steps
+        const wave = Math.sin(f * Math.PI * 3.5) * 6.5 * u + Math.sin(f * Math.PI) * 5 * u
+        bangs.push([x0 + (x1 - x0) * f, y0 + (y1 - y0) * f + wave])
+      }
+      const hairPoly = [...arc, ...bangs]
+      p.shadedFill(hairPoly, col, mul(col, SH_FELT), light, H.a, 0.35)
+      p.clip(hairPoly, () => {
+        // Brilho especular suave no topo do cabelo + fios sutis
+        p.arc(cx - 8 * u, crown + 22 * u, 30 * u, 11 * u, 200, 325, 4.2 * u, "rgba(255,255,255,0.28)")
+        const s = facing || 1
+        p.stroke(curve([cx + s * 14 * u, cut - 26 * u], [cx + s * 6 * u, cut - 14 * u], [cx + s * 2 * u, cut - 2 * u]), 1.6 * u, "rgba(255,255,255,0.2)")
+      })
+      p.inkRing(hairPoly, ow * 0.92, thick)
     } else {
-      const s = facing || (rnd(seed, 21) < 0.5 ? -1 : 1), [px, py] = R([[cx + s * 4 * u, cut + 1.5 * u]])[0]
-      p.ell(px, py, 32 * u, 0.06 * HH, shade(col, 0.8), ow, 0, 180, (a * 180) / Math.PI)
+      p.shadedFill(arc, col, mul(col, SH_FELT), light, H.a, 0.35)
+      p.clip(arc, () => {
+        p.arc(cx - 8 * u, crown + 18 * u, 24 * u, 8 * u, 205, 320, 3.5 * u, "rgba(255,255,255,0.25)")
+      })
+      p.inkRing(arc, ow * 0.92, thick)
+      const [tbx, tby] = R([[cx, crown - 2 * u]])[0]
+      p.ell(tbx, tby, 4.5 * u, 3 * u, shade(col, 0.85), ow * 0.65)
+      const s = facing || (rnd(seed, 21) < 0.5 ? -1 : 1), [px, py] = R([[cx + s * 6 * u, cut + 1.5 * u]])[0]
+      const visor = ellPts(px, py, 34 * u, 0.065 * HH, 0, 180, (a * 180) / Math.PI)
+      p.shadedFill(visor, shade(col, 0.84), mul(col, SH_FELT), light, 34 * u, 0.3)
+      p.poly(visor, null, ow * 0.9)
     }
   } else if (o.hat === "tophat") {
-    const yb = crown + 0.22 * HH, ht = 0.72 * HH, wb = 0.31 * W, wt = 0.33 * W, col = "#2e2a36"
+    const yb = crown + 0.22 * HH, ht = 0.72 * HH, wb = 0.31 * W, wt = 0.34 * W, col = "#2e2a36"
     const body = R([[cx - wb, yb], [cx + wb, yb], [cx + wt, yb - ht], [cx - wt, yb - ht]])
     p.shadedFill(body, col, mul(col, SH_FELT), light, wt, 0.4)
-    p.poly(body, null, ow)
+    p.clip(body, () => {
+      const band = R([[cx - wb * 1.05, yb], [cx + wb * 1.05, yb], [cx + wb * 1.05, yb - ht * 0.22], [cx - wb * 1.05, yb - ht * 0.22]])
+      p.poly(band, "#b83b3b", 0)
+      p.stroke(R([[cx - wb * 0.58, yb - ht * 0.25], [cx - wt * 0.58, yb - ht * 0.88]]), 3.8 * u, "rgba(255,255,255,0.22)")
+    })
+    p.inkRing(body, ow * 0.9, thick)
     const [bx, by] = R([[cx, yb + 1 * u]])[0]
-    p.ell(bx, by, 0.45 * W, 0.05 * HH, "#1d1b22", ow, 0, 360, (a * 180) / Math.PI)
+    p.ell(bx, by, 0.46 * W, 0.055 * HH, "#1d1b22", ow)
   }
 }
 
-export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutro", atividade = "nenhuma", t = 0, speaking = false, facing = 0 } = {}) {
-  const cv = document.createElement("canvas")
-  cv.width = 600
-  cv.height = 1000
-  const p = new Pen(cv.getContext("2d"))
+export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutro", atividade = "nenhuma", t = 0, speaking = false, facing = 0, targetCanvas = null, canvasWidth = 600, canvasHeight = 1000 } = {}) {
+  const cv = targetCanvas || document.createElement("canvas")
+  if (cv.width !== canvasWidth) cv.width = canvasWidth
+  if (cv.height !== canvasHeight) cv.height = canvasHeight
+  const g = cv.getContext("2d")
+  g.clearRect(0, 0, canvasWidth, canvasHeight)
+  g.save()
+  if (canvasWidth !== 600 || canvasHeight !== 1000) g.scale(canvasWidth / 600, canvasHeight / 1000)
+  const p = new Pen(g)
 
   const seed = o.seed || 1
-  const mode = acao === "correr" ? "march" : acao === "andar" ? "stroll" : "stand"
-  const phase = acao === "correr" ? t * 1.9 : acao === "andar" ? t * 1.1 : 0
-  const exprKey = EXPR_MAP[expressao] || (acao === "assustado" || acao === "bochecha" ? "shock" : acao === "debochar" ? "grin" : acao === "comemorar" ? "laugh" : "neutral")
+  const mode = acao === "correr" || atividade === "correr" ? "march" : acao === "andar" ? "stroll" : atividade === "voar" ? "fly" : "stand"
+  const phase = mode === "march" ? t * 1.9 : mode === "stroll" ? t * 1.1 : mode === "fly" ? t * 2.2 : 0
+  const exprKey = EXPR_MAP[expressao] || (acao === "assustado" || acao === "bochecha" ? "shock" : acao === "debochar" ? "grin" : acao === "comemorar" ? "laugh" : atividade === "voar" ? "shock" : "neutral")
   const blink = piscar(t, seed)
   const idl = idleMotion(t, seed)
 
@@ -532,7 +581,7 @@ export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutr
   const skin = o.skin || SKIN
   const H = headBlob(seed, Bd.a, facing), W = 2 * H.a, HH = 2 * H.b, u = W / 100
   const tall = (1 + Bd.torso + Bd.legs) * HH, sole = 975
-  const bob = mode === "march" ? 0.025 * tall * Math.cos(2 * TAU * phase) : mode === "stroll" ? 0.015 * tall * Math.cos(2 * TAU * phase) : idl.bob
+  const bob = mode === "march" ? 0.025 * tall * Math.cos(2 * TAU * phase) : mode === "stroll" ? 0.015 * tall * Math.cos(2 * TAU * phase) : mode === "fly" ? 0.03 * tall * Math.sin(TAU * phase) : idl.bob
   const torsoBot = sole - Bd.legs * HH + bob
   const chin = torsoBot - Bd.torso * HH, hc = chin - H.b, hipY = torsoBot - 0.12 * HH
   const thick = thickAngle(DEF_LIGHT), ow = 5 * u
@@ -540,33 +589,38 @@ export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutr
   const legW = 5.8 * u, footW = 7.5 * u
 
   // Pernas e pés
-  const L = mode === "march" ? 75 : mode === "stroll" ? 33 : 0
+  const L = mode === "march" ? 75 : mode === "stroll" ? 33 : mode === "fly" ? 58 : 0
   for (const [side, ph] of [[-1, 0], [1, 0.5]]) {
-    const up = Math.max(0, Math.sin(TAU * (phase + ph))) * L
-    const hx = 300 + side * 15 * u, fx = 300 + side * 22 * u, fy = sole - 4 * u - up
+    const up = Math.max(0, Math.sin(TAU * (phase + ph))) * L + (mode === "fly" ? 28 * u : 0)
+    const hx = 300 + side * 15 * u, fx = 300 + side * (mode === "fly" ? 28 * u : 22 * u), fy = sole - 4 * u - up
     const k = [(hx + fx) / 2 + side * (1.5 * u + up * 0.16), (hipY + fy) / 2 - up * 0.08]
     p.stroke(curve([hx, hipY], k, [fx, fy]), legW, legCol)
     p.stroke([[fx - side * 3 * u, fy], [fx + side * 13 * u, fy + 0.5 * u]], footW, footCol)
   }
 
-  // Corpo com balanço contínuo (idle + caminhada)
-  const sway = (mode === "march" ? 2.2 * Math.sin(TAU * phase) : mode === "stroll" ? 1.2 * Math.sin(TAU * phase) : idl.tilt) + (acao === "debochar" ? Math.sin(t * 9) * 2.5 : 0)
+  // Corpo com balanço contínuo (idle + caminhada + voo)
+  const sway = (mode === "march" ? 2.2 * Math.sin(TAU * phase) : mode === "stroll" ? 1.2 * Math.sin(TAU * phase) : mode === "fly" ? 9 * Math.sin(TAU * phase * 0.7) : idl.tilt) + (acao === "debochar" ? Math.sin(t * 9) * 2.5 : 0)
   p.rot = sway ? [rad(sway), 300, hipY] : null
   const T = { a: ((Bd.tw / 2) * W) / 1.06, b: 0.5 * (torsoBot - (chin - 0.25 * HH)), nTop: 2.2, nBot: 2.6, egg: 0.12, asym: 0.04 * facing, rot: 0, noise: 0.006, seed: seed + 7 }
   const tcx = 300 + 3 * u * facing, tcy = torsoBot - T.b, tp = blobPts(tcx, tcy, T)
 
-  // Braços articulados com todas as poses expressivas (roman.js + storybook)
+  // Braços articulados com todas as poses expressivas (roman.js + storybook + atividades)
   const sh = (side) => [tcx + side * 0.85 * T.a, chin + 0.12 * HH]
   const sw = mode === "march" || mode === "stroll" ? Math.sin(TAU * phase) : 0
   const armPoints = (side) => {
     const S = sh(side)
     const X = (k) => tcx + side * (T.a * 1.1 + k * u)
+    if (atividade === "voar") {
+      const fl = Math.sin(t * 14 + side) * 0.22 * HH
+      return { pts: [S, [X(20), S[1] - 0.3 * HH + fl], [X(36), S[1] - 0.7 * HH - fl]], front: false }
+    }
     if (acao === "acenar" && side === 1) {
       const wv = Math.sin(t * 7)
       return { pts: [S, [X(16), S[1] - 0.2 * HH], [X(28 + 10 * wv), S[1] - 0.62 * HH]], front: false }
     }
     if (acao === "assustado" || acao === "comemorar") {
-      return { pts: [S, [X(16), S[1] - 0.28 * HH], [X(24), S[1] - 0.72 * HH]], front: false }
+      const bounce = acao === "comemorar" ? Math.sin(t * 10) * 0.08 * HH : 0
+      return { pts: [S, [X(16), S[1] - 0.28 * HH], [X(24), S[1] - 0.72 * HH + bounce]], front: false }
     }
     if (acao === "bochecha") {
       return { pts: [S, [X(16), S[1] + 0.05 * HH], [300 + side * (H.a + 2 * u), hc + 0.25 * H.b]], front: false }
@@ -589,6 +643,17 @@ export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutr
     if (acao === "mostrar" && side === 1) {
       return { pts: [S, [X(28), S[1] - 0.02 * HH], [X(62), S[1] - 0.1 * HH]], front: false, finger: true }
     }
+    if (atividade === "observar" && side === 1) {
+      return { pts: [S, [X(24), S[1] - 0.25 * HH], [300 + 26 * u, hc - 16 * u]], front: true }
+    }
+    if (atividade === "comer" && side === 1) {
+      const bite = Math.abs(Math.sin(t * 4.5))
+      return { pts: [S, [X(18), S[1] + 0.15 * HH], [300 + 18 * u, hc + (26 - bite * 10) * u]], front: true, snack: true }
+    }
+    if (atividade === "trabalhar") {
+      const work = Math.sin(t * 9 + side) * 10 * u
+      return { pts: [S, [X(14), S[1] + 0.24 * HH], [tcx + side * 16 * u, S[1] + 0.32 * HH + work]], front: true }
+    }
     if (atividade === "pescar" && side === 1) {
       return { pts: [S, [X(18), S[1] + 0.18 * HH], [X(38), S[1] - 0.06 * HH]], front: false }
     }
@@ -607,6 +672,9 @@ export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutr
     }
     if (armObj.thumb) {
       p.stroke([[hx, hy], [hx + Math.sign(hx - 300) * 6 * u, hy - 12 * u]], 2.6 * u)
+    }
+    if (armObj.snack) {
+      p.ell(hx, hy - 7 * u, 9 * u, 9 * u, "#e0483e", 2.2 * u)
     }
     if (armObj.swirl) {
       const sp = []
@@ -630,8 +698,9 @@ export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutr
   if (rightArm.front) drawArm(rightArm)
   if (atividade === "pescar") {
     const [hx, hy] = rightArm.pts[2]
-    p.stroke([[hx - 8 * u, hy + 18 * u], [hx + 68 * u, hy - 98 * u]], 3.2 * u, "#6e4726")
-    p.stroke([[hx + 68 * u, hy - 98 * u], [hx + 72 * u, hy + 125 * u]], 1.2 * u, "rgba(255,255,255,0.7)")
+    const swayRod = Math.sin(t * 2.5) * 4 * u
+    p.stroke([[hx - 8 * u, hy + 18 * u], [hx + 68 * u, hy - 98 * u + swayRod]], 3.2 * u, "#6e4726")
+    p.stroke([[hx + 68 * u, hy - 98 * u + swayRod], [hx + 72 * u, hy + 125 * u]], 1.2 * u, "rgba(255,255,255,0.7)")
   }
 
   // Cabeça gira sutilmente com o corpo + própria inclinação idle
@@ -643,12 +712,20 @@ export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutr
   drawHat(p, o, hp, H, 300, hc, DEF_LIGHT, seed, facing)
 
   if (o.beard) {
-    const [cx, cy] = [300, hc]
-    const beardPts = [[cx - 32 * u, cy + 11 * u], [cx, cy + 62 * u], [cx + 32 * u, cy + 11 * u], [cx, cy + 20 * u]]
-    p.poly(beardPts, o.beard, 3.6 * u)
-    for (let i = -18; i <= 18; i += 9) {
-      p.stroke([[cx + i * u, cy + 22 * u], [cx + i * 0.55 * u, cy + 44 * u]], 1.6 * u, "#9c704c")
-    }
+    const [cx, cy] = [300 + 4 * u * facing, hc]
+    const beardPts = [
+      ...curve([cx - 34 * u, cy + 12 * u], [cx - 32 * u, cy + 44 * u], [cx, cy + 64 * u], 14),
+      ...curve([cx, cy + 64 * u], [cx + 32 * u, cy + 44 * u], [cx + 34 * u, cy + 12 * u], 14),
+      ...curve([cx + 34 * u, cy + 12 * u], [cx, cy + 20 * u], [cx - 34 * u, cy + 12 * u], 10),
+    ]
+    p.shadedFill(beardPts, o.beard, mul(o.beard, SH_FELT), DEF_LIGHT, 38 * u, 0.35)
+    p.clip(beardPts, () => {
+      const hi = shade(o.beard, 1.32)
+      for (const ox of [-16, -6, 6, 16]) {
+        p.stroke(curve([cx + ox * u, cy + 22 * u], [cx + ox * 0.85 * u, cy + 38 * u], [cx + ox * 0.45 * u, cy + 52 * u]), 1.8 * u, hi)
+      }
+    })
+    p.inkRing(beardPts, ow * 0.82, thick)
   }
 
   // Rosto (olhos, piscada, sobrancelhas afinadas, boca com lip-sync)
@@ -664,5 +741,6 @@ export function drawToonCharacterCanvas(o, { acao = "parado", expressao = "neutr
   }
   drawMouth(p, F.mouth, 300 + 8 * u * facing, hc + 20 * u, u, speaking, t)
   p.rot = null
+  g.restore()
   return cv
 }

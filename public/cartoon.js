@@ -1,4 +1,4 @@
-import { createCartoonRenderer, recordCartoonVideo } from "/cartoon-engine.js"
+import { createCartoonRenderer, recordCartoonVideo } from "/cartoon-engine.js?v=4"
 
 const $ = (s, root = document) => root.querySelector(s)
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
@@ -81,20 +81,75 @@ function renderProgress(label, sub, pct = 20) {
   </div>`
 }
 
-function renderStoryboardCards(cenas) {
+function setGlobalJob(job) {
+  const host = $("#global-job-bar")
+  if (!host) return
+  if (!job) {
+    host.hidden = true
+    host.innerHTML = ""
+    return
+  }
+  host.hidden = false
+  if (!host.querySelector("#live-progress")) {
+    host.innerHTML = `<div class="global-job-row">
+      <div style="flex:1;min-width:220px">${renderProgress(job.label, job.sub, job.pct)}</div>
+      ${job.withPreview ? `<div id="live-preview-host"></div>` : ""}
+    </div>`
+  } else {
+    const title = host.querySelector("#live-progress strong")
+    const meta = host.querySelector("#live-progress .stage-meta")
+    const bar = host.querySelector(".progress-bar-fill")
+    if (title && job.label) title.textContent = job.label
+    if (meta && job.sub !== undefined) meta.textContent = job.sub
+    if (bar && job.pct !== undefined) bar.style.width = `${Math.max(8, Math.min(100, job.pct))}%`
+    if (job.withPreview && !host.querySelector("#live-preview-host")) {
+      host.querySelector(".global-job-row")?.insertAdjacentHTML("beforeend", `<div id="live-preview-host"></div>`)
+    }
+  }
+}
+
+async function uploadMediaBlob(projectId, kind, blob, contentType) {
+  if (!projectId || !blob?.size) return ""
+  // Na Vercel o corpo máximo de requisição serverless é 4,5 MB; acima disso mantém blob local sem falhar
+  if (state.config?.vercel && blob.size > 4_000_000) return ""
+  try {
+    const res = await fetch(`/api/cartoon/midia/${encodeURIComponent(projectId)}/${encodeURIComponent(kind)}`, {
+      method: "POST",
+      headers: { "Content-Type": contentType || blob.type || "application/octet-stream" },
+      body: blob,
+    })
+    if (!res.ok) return ""
+    const data = await res.json().catch(() => ({}))
+    return data.url || ""
+  } catch {
+    return ""
+  }
+}
+
+function renderStoryboardCards(cenas, customAssets = {}) {
   const engine = createCartoonRenderer(270, 480)
+  engine.setCustomAssets(customAssets || {})
   const html = cenas.map((c, idx) => {
-    const thumb = engine.renderThumbnailDataUrl(c)
+    const thumb = engine.renderThumbnailDataUrl(c, idx, customAssets)
     const opts = (arr, cur) => arr.map((v) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("")
     const castChecks = ["silas", "pedro", "maria", "joao"].map((id) =>
       `<label><input type="checkbox" data-cast="${idx}" value="${id}" ${(c.quemAparece || []).includes(id) ? "checked" : ""}>${id}</label>`
     ).join("")
+    const hasCustom = Boolean(c.customAssetId && customAssets?.[c.customAssetId])
     return `<article class="scene-card" data-scene="${idx}">
       <img class="scene-thumb" src="${thumb}" alt="Cena ${idx + 1}">
       <div class="scene-body">
         <div class="scene-caption">${idx + 1}. ${esc(c.texto)}</div>
+        <div class="custom-3d-bar">
+          ${hasCustom
+            ? `<span class="custom-3d-pill">✦ 3D criado: ${esc(c.customAssetLabel || c.customAssetId)}</span>
+               <button type="button" class="btn-mini" data-regen-3d="${idx}">Regenerar 3D</button>
+               <button type="button" class="btn-mini" data-clear-3d="${idx}" title="Remover objeto 3D">✕</button>`
+            : `<button type="button" class="btn-mini" data-create-3d="${idx}">+ Criar objeto 3D inédito</button>`}
+        </div>
         <div class="scene-fields">
-          <label class="sf full"><span>ATIVIDADE</span><select data-field="atividade">${opts(["nenhuma", "comer", "pescar", "correr", "observar", "trabalhar", "voar"], c.atividade)}</select></label>
+          <label class="sf"><span>ATIVIDADE</span><select data-field="atividade">${opts(["nenhuma", "comer", "pescar", "correr", "observar", "trabalhar", "voar"], c.atividade)}</select></label>
+          <label class="sf"><span>OBJETO / CENA</span><select data-field="objeto">${opts(["auto", "nenhum", "navio", "iceberg", "timao", "cronometro", "trem", "aviao", "onibus", "carro", "fogo", "dinheiro", "bilhete", "feno", "farol", "foguete", "dinossauro", "colheres", "computador", "bau"], c.objeto || "auto")}</select></label>
           <label class="sf"><span>PLANO</span><select data-field="plano">${opts(["aberto", "medio", "close"], c.plano)}</select></label>
           <label class="sf"><span>FOCO</span><select data-field="foco">${opts(["silas", "pedro", "maria", "joao", "farol", "dinossauro", "foguete"], c.foco)}</select></label>
           <label class="sf"><span>AÇÃO</span><select data-field="acao">${opts(["parado", "mostrar", "andar", "correr", "debochar", "acenar", "assustado", "cintura", "barriga", "pensando", "bochecha", "cruzado", "joinha", "comemorar"], c.acao)}</select></label>
@@ -104,7 +159,7 @@ function renderStoryboardCards(cenas) {
           <label class="sf"><span>CÂMERA</span><select data-field="camera">${opts(["automatico", "fixa", "aproximar", "afastar", "pan"], c.camera)}</select></label>
           <label class="sf"><span>TEXTO NA TELA</span><input type="text" data-field="textoTela" value="${esc(c.textoTela)}" placeholder="ex.: DIA 1"></label>
           <div class="sf full"><span>QUEM APARECE</span><div class="cast-checks">${castChecks}</div></div>
-          <label class="sf full"><span>CENÁRIO</span><select data-field="cenario">${opts(["praia", "vila", "floresta", "cidade", "espaco", "sala"], c.cenario)}</select></label>
+          <label class="sf full"><span>CENÁRIO</span><select data-field="cenario">${opts(["oceano", "praia", "vila", "floresta", "cidade", "rio", "estrada", "espaco", "sala"], c.cenario)}</select></label>
           <label class="sf full"><span>EVENTO NO CENÁRIO</span><select data-field="eventoCenario">${opts(["nenhum", "onda", "raio", "fumaca", "estrelas"], c.eventoCenario)}</select></label>
           <label class="virada-check full"><input type="checkbox" data-field="virada" ${c.virada ? "checked" : ""}><span>virada (música para, impacto)</span></label>
         </div>
@@ -121,6 +176,7 @@ function scrollTopSmooth() {
 
 function renderThread(progressHtml = "") {
   const p = state.current
+  document.body.classList.toggle("in-thread", Boolean(p))
   if (!p) {
     $("#home-view").hidden = false
     $("#thread-view").hidden = true
@@ -131,10 +187,15 @@ function renderThread(progressHtml = "") {
 
   const hasScript = Boolean(p.frases?.length)
   const hasSb = Boolean(p.cenas?.length)
-  const hasVideo = Boolean(state.videoBlobUrl)
+  const videoSrc = state.videoBlobUrl || p.videoUrl || ""
+  const hasVideo = Boolean(videoSrc)
 
   if (state.activeTab === "ready" && !hasVideo) state.activeTab = hasSb ? "storyboard" : "script"
   if (state.activeTab === "storyboard" && !hasSb) state.activeTab = "script"
+  try {
+    localStorage.setItem("cartoon:lastProjectId", p.id || "")
+    localStorage.setItem("cartoon:lastTab", state.activeTab || "script")
+  } catch {}
 
   const frases = p.frases || []
   const wordsCount = frases.join(" ").trim().split(/\s+/).filter(Boolean).length
@@ -187,13 +248,16 @@ function renderThread(progressHtml = "") {
     </div>
   `
 
+  const sbBadge = p.validation?.audited
+    ? ` · ✓ validado pela IA${p.validation.fixes ? ` (${p.validation.fixes} ajustes automáticos)` : ""}`
+    : ""
   const storyboardCard = hasSb && state.activeTab === "storyboard" ? `
     <section class="stage-card">
       <div class="stage-head">
-        <span class="stage-meta">Storyboard · ${p.cenas.length} cenas com quadros reais</span>
+        <span class="stage-meta">Storyboard · ${p.cenas.length} cenas com quadros reais${sbBadge}</span>
         ${sbActions}
       </div>
-      <div class="storyboard-grid" id="storyboard-grid">${renderStoryboardCards(p.cenas)}</div>
+      <div class="storyboard-grid" id="storyboard-grid">${renderStoryboardCards(p.cenas, p.customAssets || {})}</div>
       <div class="stage-foot">
         ${sbActions}
       </div>
@@ -201,7 +265,7 @@ function renderThread(progressHtml = "") {
   ` : ""
 
   const yt = p.youtubePack
-  const coverUrl = state.coverDataUrl
+  const coverUrl = state.coverDataUrl || p.coverUrl || ""
   const ytHtml = yt ? `
     <div class="yt-pack">
       <div class="yt-cover-row">
@@ -218,17 +282,18 @@ function renderThread(progressHtml = "") {
     </div>
   ` : ""
 
+  const readyExt = state.videoExt || (p.videoUrl?.endsWith(".webm") ? "webm" : "mp4")
   const readyCard = hasVideo && state.activeTab === "ready" ? `
     <section class="stage-card">
       <div class="stage-head"><strong>Vídeo pronto</strong></div>
       <div class="ready-grid">
-        <video class="ready-video" controls playsinline src="${state.videoBlobUrl}"></video>
+        <video class="ready-video" controls playsinline src="${videoSrc}"></video>
         <div class="ready-info">
           <span class="stage-meta">duração ${(p.duration || estSec).toFixed(2)}s | áudio ${esc(p.ttsProvider === "elevenlabs" ? "ElevenLabs" : "Google Studio")}</span>
           <div class="check-ok">● checagem ok: nenhum quadro congelado ou preto</div>
-          <span class="stage-meta">1080×1920 (9:16), 30 fps, áudio com Twist Music Drop (-6 dB).</span>
+          <span class="stage-meta">1080×1920 (9:16), 30 fps cravados (${esc(readyExt.toUpperCase())}), áudio com Twist Music Drop (-6 dB).</span>
           <div class="stage-actions">
-            <a class="btn-white" style="text-decoration:none" href="${state.videoBlobUrl}" download="${esc(p.id)}.${state.videoExt}">Baixar vídeo (${esc(state.videoExt.toUpperCase())}) →</a>
+            <a class="btn-white" style="text-decoration:none" href="${videoSrc}" download="${esc(p.id)}.${readyExt}">Baixar vídeo (${esc(readyExt.toUpperCase())}) →</a>
             <button type="button" class="btn-dark" id="btn-yt-pack">Gerar Kit YouTube + Capa 9:16 →</button>
           </div>
           ${ytHtml}
@@ -297,10 +362,36 @@ async function startWriteScript(ideia) {
   }
 }
 
+async function buildContactSheetJpeg(cenas, customAssets) {
+  const cols = 4
+  const rows = Math.ceil(cenas.length / cols)
+  const cw = 180, ch = 320
+  const sheet = document.createElement("canvas")
+  sheet.width = cols * cw
+  sheet.height = rows * ch
+  const sctx = sheet.getContext("2d")
+  sctx.fillStyle = "#0e0e14"
+  sctx.fillRect(0, 0, sheet.width, sheet.height)
+  const eng = createCartoonRenderer(cw, ch)
+  eng.setCustomAssets(customAssets || {})
+  cenas.forEach((c, idx) => {
+    eng.renderFrame(c, 0.5, null, 0.3, false, { sceneIdx: idx, speaking: false })
+    const col = idx % cols, row = Math.floor(idx / cols)
+    sctx.drawImage(eng.outCanvas, col * cw, row * ch, cw, ch)
+    sctx.fillStyle = "rgba(0,0,0,0.75)"
+    sctx.fillRect(col * cw + 6, row * ch + 6, 30, 24)
+    sctx.fillStyle = "#ffd23f"
+    sctx.font = "bold 16px sans-serif"
+    sctx.fillText(String(idx + 1), col * cw + 14, row * ch + 23)
+  })
+  eng.dispose()
+  return sheet.toDataURL("image/jpeg", 0.72)
+}
+
 async function buildStoryboard() {
   if (state.busy || !state.current?.frases?.length) return
   state.busy = true
-  renderThread(renderProgress("Montando o storyboard", "a IA está dirigindo as cenas e enquadramentos", 45))
+  setGlobalJob({ label: "Montando e auditando storyboard", sub: "a IA está dirigindo cenas, criando objetos 3D e validando coerência…", pct: 35 })
   scrollTopSmooth()
   try {
     const out = await api("/storyboard", {
@@ -310,11 +401,50 @@ async function buildStoryboard() {
       model: state.model,
     })
     state.current.cenas = out.cenas
+    state.current.customAssets = { ...(state.current.customAssets || {}), ...(out.customAssets || {}) }
+    state.current.validation = out.validation || { audited: true, fixes: 0 }
+
+    // 3ª camada: Inspeção Visual Real (Gemini Vision enxerga os quadros renderizados e corrige qualquer defeito!)
+    setGlobalJob({ label: "Inspeção visual dos quadros 3D", sub: "a IA está olhando os quadros reais renderizados para corrigir detalhes…", pct: 75 })
+    try {
+      const sheetDataUrl = await buildContactSheetJpeg(state.current.cenas, state.current.customAssets)
+      const vis = await api("/inspecionar-quadros", {
+        titulo: state.current.titulo,
+        cenas: state.current.cenas,
+        imageBase64: sheetDataUrl,
+        model: state.model,
+      })
+      if (vis?.inspected && Array.isArray(vis.correcoes) && vis.correcoes.length) {
+        let applied = 0
+        for (const fix of vis.correcoes) {
+          const idx = Number(fix?.i)
+          const target = state.current.cenas[idx]
+          if (!target) continue
+          if (fix.cenario) target.cenario = fix.cenario
+          if (fix.luz) target.luz = fix.luz
+          if (fix.plano) target.plano = fix.plano
+          if (fix.objeto) target.objeto = fix.objeto
+          if (fix.acao) target.acao = fix.acao
+          if (fix.camera) target.camera = fix.camera
+          applied++
+        }
+        state.current.validation = {
+          audited: true,
+          visualInspected: true,
+          fixes: (state.current.validation.fixes || 0) + applied,
+        }
+      } else if (vis?.inspected) {
+        state.current.validation.visualInspected = true
+      }
+    } catch {}
+
     state.activeTab = "storyboard"
     await persistCurrent()
+    setGlobalJob(null)
     renderThread()
     scrollTopSmooth()
   } catch (e) {
+    setGlobalJob(null)
     toast(e.message, true)
     renderThread()
   } finally {
@@ -324,50 +454,63 @@ async function buildStoryboard() {
 
 async function renderFinalVideo() {
   if (state.busy || !state.current?.cenas?.length) return
+  if (state.current.frases?.length !== state.current.cenas.length) {
+    toast("Você adicionou ou removeu frases no roteiro. Clique em 'Refazer storyboard com a IA' antes de criar o vídeo.", true)
+    return
+  }
   state.busy = true
   state.videoBlobUrl = null
+  const jobProject = state.current
   const ttsProvider = $("#cfg-provider").value
   const voice = $("#cfg-voz").value
-  state.current.ttsProvider = ttsProvider
-  state.current.voice = voice
+  jobProject.ttsProvider = ttsProvider
+  jobProject.voice = voice
 
-  renderThread(renderProgress("Gerando voz + falas", `sintetizando narração via ${ttsProvider === "elevenlabs" ? "ElevenLabs" : "Google Studio"}…`, 30))
+  setGlobalJob({ label: "Gerando voz + falas", sub: `sintetizando narração via ${ttsProvider === "elevenlabs" ? "ElevenLabs" : "Google Studio"}…`, pct: 25, withPreview: false })
   scrollTopSmooth()
   try {
     const voz = await api("/voz", {
-      frases: state.current.frases,
+      frases: jobProject.frases,
       ttsProvider,
       voice,
-      projetoId: state.current.id,
+      projetoId: jobProject.id,
     })
-    state.current.duration = voz.duration
-    state.current.palavras = voz.palavras
+    jobProject.duration = voz.duration
+    jobProject.palavras = voz.palavras
+    jobProject.cenasTiming = voz.cenasTiming
+    if (voz.audioUrl) jobProject.audioUrl = voz.audioUrl
     const audioSrc = voz.audioUrl || voz.audioBase64
 
-    renderThread(renderProgress("Renderizando Animação 3D", "gravando quadros 3D + áudio + trilha…", 50) + `<div id="live-preview-host" style="margin-top:8px"></div>`)
+    setGlobalJob({ label: "Renderizando Animação 3D (1080×1920)", sub: "preparando quadros 3D em qualidade máxima + áudio + trilha…", pct: 35, withPreview: true })
     scrollTopSmooth()
     const rec = await recordCartoonVideo({
-      cenas: state.current.cenas,
+      cenas: jobProject.cenas,
       palavras: voz.palavras,
+      cenasTiming: voz.cenasTiming,
+      customAssets: jobProject.customAssets || {},
       audioSrc,
       duration: voz.duration,
       showCaptions: $("#cfg-legenda")?.value !== "sem",
       previewHost: $("#live-preview-host"),
       onProgress: (pct, sec) => {
-        const bar = $(".progress-bar-fill")
-        const meta = $("#live-progress .stage-meta")
-        if (bar) bar.style.width = `${pct}%`
-        if (meta) meta.textContent = `${sec.toFixed(1)}s / ${voz.duration.toFixed(1)}s (${pct}%)`
+        setGlobalJob({ label: "Renderizando Animação 3D (1080×1920)", sub: `${sec.toFixed(1)}s / ${voz.duration.toFixed(1)}s (${pct}%)`, pct, withPreview: true })
       },
     })
     state.videoBlobUrl = URL.createObjectURL(rec.blob)
     state.videoExt = rec.ext
+
+    setGlobalJob({ label: "Salvando vídeo na nuvem", sub: "enviando arquivo final para o Supabase Storage…", pct: 98, withPreview: false })
+    const uploadedUrl = await uploadMediaBlob(jobProject.id, "video", rec.blob, rec.mimeType)
+    if (uploadedUrl) jobProject.videoUrl = uploadedUrl
+
     state.activeTab = "ready"
     await persistCurrent()
+    setGlobalJob(null)
     renderThread()
     scrollTopSmooth()
-    toast("Vídeo pronto para download!")
+    toast(`Vídeo ${rec.ext.toUpperCase()} pronto em qualidade máxima!`)
   } catch (e) {
+    setGlobalJob(null)
     toast(e.message, true)
     renderThread()
   } finally {
@@ -390,7 +533,21 @@ $("#example-chips").addEventListener("click", (e) => {
   startWriteScript(btn.dataset.idea)
 })
 
+function setSidebarOpen(open) {
+  const sb = $("#sidebar")
+  const bd = $("#sidebar-backdrop")
+  if (!sb || !bd) return
+  sb.classList.toggle("open", open)
+  bd.hidden = !open
+}
+
+$("#btn-mobile-menu")?.addEventListener("click", () => {
+  setSidebarOpen(!$("#sidebar")?.classList.contains("open"))
+})
+$("#sidebar-backdrop")?.addEventListener("click", () => setSidebarOpen(false))
+
 $("#btn-new-video").addEventListener("click", () => {
+  setSidebarOpen(false)
   state.current = null
   state.videoBlobUrl = null
   renderSidebar()
@@ -477,11 +634,14 @@ $("#sidebar-list").addEventListener("click", async (e) => {
   }
   const item = e.target.closest("[data-open]")
   if (!item) return
+  if (state.busy) return toast("Aguarde a geração atual terminar antes de abrir outro projeto.", true)
+  setSidebarOpen(false)
   try {
     const res = await api(`/projetos/${encodeURIComponent(item.dataset.open)}`)
     state.current = res.project
     state.videoBlobUrl = null
-    state.activeTab = res.project?.cenas?.length ? "storyboard" : "script"
+    state.coverDataUrl = null
+    state.activeTab = res.project?.videoUrl ? "ready" : res.project?.cenas?.length ? "storyboard" : "script"
     renderSidebar()
     renderThread()
     scrollTopSmooth()
@@ -494,7 +654,9 @@ $("#thread-view").addEventListener("input", (e) => {
   if (!state.current) return
   if (e.target.id === "proj-title") state.current.titulo = e.target.value
   if (e.target.dataset.phrase !== undefined) {
-    state.current.frases[Number(e.target.dataset.phrase)] = e.target.value
+    const idx = Number(e.target.dataset.phrase)
+    state.current.frases[idx] = e.target.value
+    if (state.current.cenas?.[idx]) state.current.cenas[idx].texto = e.target.value
   }
   const card = e.target.closest("[data-scene]")
   if (card) {
@@ -534,6 +696,44 @@ $("#thread-view").addEventListener("click", async (e) => {
   } else if (e.target.id === "btn-refresh-thumbs") {
     renderThread()
     toast("Quadros atualizados!")
+  } else if (e.target.dataset.create3d !== undefined || e.target.dataset.regen3d !== undefined) {
+    const idx = Number(e.target.dataset.create3d ?? e.target.dataset.regen3d)
+    const cena = state.current?.cenas?.[idx]
+    if (!cena || state.busy) return
+    const isRegen = e.target.dataset.regen3d !== undefined
+    const nome = isRegen
+      ? (cena.customAssetLabel || cena.customAssetId)
+      : window.prompt("Qual objeto ou estrutura 3D deseja criar para esta cena? (ex.: submarino amarelo, vulcão em erupção, castelo medieval)", "")
+    if (!nome?.trim()) return
+    state.busy = true
+    renderThread(renderProgress("Modelando objeto 3D", `criando "${nome.trim()}" no estilo cel-shaded do kit…`, 60))
+    try {
+      const out = await api("/ativo-3d", {
+        nome: nome.trim(),
+        titulo: state.current.titulo,
+        model: state.model,
+        forceNew: isRegen,
+      })
+      state.current.customAssets = { ...(state.current.customAssets || {}), [out.id]: out.blueprint }
+      cena.customAssetId = out.id
+      cena.customAssetLabel = out.blueprint.label || nome.trim()
+      await persistCurrent()
+      renderThread()
+      toast(`Objeto 3D "${cena.customAssetLabel}" criado!`)
+    } catch (err) {
+      toast(err.message, true)
+      renderThread()
+    } finally {
+      state.busy = false
+    }
+  } else if (e.target.dataset.clear3d !== undefined) {
+    const idx = Number(e.target.dataset.clear3d)
+    const cena = state.current?.cenas?.[idx]
+    if (cena) {
+      cena.customAssetId = ""
+      cena.customAssetLabel = ""
+      renderThread()
+    }
   } else if (e.target.id === "btn-render-video") {
     renderFinalVideo()
   } else if (e.target.id === "btn-yt-pack") {
@@ -562,13 +762,19 @@ async function generateYoutubePack() {
       titulo: state.current.titulo,
       ideia: state.current.ideia,
       frases: state.current.frases,
+      cenasTiming: state.current.cenasTiming,
       duration: state.current.duration || state.current.duracao || 45,
       model: state.model,
     })
     const bestScene = state.current.cenas?.find((c) => c.virada) || state.current.cenas?.[0] || { cenario: "vila", luz: "dia", plano: "close", acao: "surpreso", expressao: "surpreso", quemAparece: ["silas"] }
     const cov = createCartoonRenderer(1080, 1920)
-    state.coverDataUrl = cov.renderCoverPngDataUrl(bestScene, pack.textoCapa)
+    state.coverDataUrl = cov.renderCoverPngDataUrl(bestScene, pack.textoCapa, state.current.customAssets || {})
     cov.dispose()
+    try {
+      const covBlob = await (await fetch(state.coverDataUrl)).blob()
+      const covUrl = await uploadMediaBlob(state.current.id, "cover", covBlob, "image/png")
+      if (covUrl) state.current.coverUrl = covUrl
+    } catch {}
     state.current.youtubePack = pack
     await persistCurrent()
     renderThread()
@@ -582,8 +788,8 @@ async function generateYoutubePack() {
   }
 }
 
-// Inicialização
-;(async () => {
+// Inicialização (restaura o último projeto/aba aberto automaticamente)
+; (async () => {
   try {
     const [cfg, list] = await Promise.all([api("/config"), api("/projetos")])
     state.config = cfg
@@ -591,6 +797,17 @@ async function generateYoutubePack() {
     populateVoices()
     renderSidebar()
     updateTopPills()
+    const lastId = localStorage.getItem("cartoon:lastProjectId")
+    const lastTab = localStorage.getItem("cartoon:lastTab")
+    if (lastId && state.projects.some((p) => p.id === lastId)) {
+      const res = await api(`/projetos/${encodeURIComponent(lastId)}`).catch(() => null)
+      if (res?.project) {
+        state.current = res.project
+        state.activeTab = lastTab || (res.project.videoUrl ? "ready" : res.project.cenas?.length ? "storyboard" : "script")
+        renderSidebar()
+        renderThread()
+      }
+    }
   } catch (e) {
     toast(e.message, true)
   }

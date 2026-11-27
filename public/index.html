@@ -6,14 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0b0d">
   <title>cartoon · Estúdio de Animação 3D</title>
-  <link rel="stylesheet" href="/cartoon.css?v=1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/cartoon.css?v=4">
   <script src="/vendor/three.min.js" defer></script>
-  <script type="module" src="/cartoon.js?v=1"></script>
+  <script type="module" src="/cartoon.js?v=4"></script>
 </head>
 
 <body>
   <header class="topbar">
     <div class="topbar-left">
+      <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" aria-label="Abrir lista de vídeos" title="Seus vídeos">☰</button>
       <a href="#home" class="brand" id="btn-home">
         <span class="brand-word">carto<span class="brand-o">o<i class="sparkle" aria-hidden="true">✦</i></span>n</span>
         <span class="beta-pill">BETA</span>
@@ -37,7 +39,8 @@
   </header>
 
   <div class="layout">
-    <aside class="sidebar">
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-label">SEUS VÍDEOS</div>
       <div id="sidebar-list" class="sidebar-list">
         <p class="sidebar-empty">Nenhum vídeo ainda.</p>
@@ -78,6 +81,9 @@
               dormir segurando duas colheres, acorda com uma ideia</button>
           </div>
         </section>
+
+        <!-- GLOBAL JOB PROGRESS (persiste ao alternar abas) -->
+        <div id="global-job-bar" class="global-job-bar" hidden></div>
 
         <!-- THREAD / PROJECT VIEW -->
         <section id="thread-view" class="thread-view" hidden></section>

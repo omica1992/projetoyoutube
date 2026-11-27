@@ -1,9 +1,5 @@
 import { readFile, writeFile, rename, unlink } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
-import { spawn } from "node:child_process"
-import os from "node:os"
-import path from "node:path"
-import ffmpegPath from "ffmpeg-static"
 import { hasSupabase, kvGet, kvSet } from "./db.js"
 
 const keys = { vidiq: "VIDIQ_API_KEY", gemini: "GEMINI_API_KEY", youtube: "YOUTUBE_API_KEY", opencode: "OPENCODE_API_KEY", elevenlabs: "ELEVENLABS_API_KEY" }
@@ -274,40 +270,21 @@ export async function elevenVoices(key) {
   }
 }
 
-function mp3BufferToWav(mp3Buf) {
-  return new Promise(async (resolve, reject) => {
-    const id = randomUUID().slice(0, 8)
-    const inFile = path.join(os.tmpdir(), `el-${id}.mp3`)
-    const outFile = path.join(os.tmpdir(), `el-${id}.wav`)
-    try {
-      await writeFile(inFile, mp3Buf)
-      const child = spawn(ffmpegPath || "ffmpeg", ["-y", "-i", inFile, "-acodec", "pcm_s16le", "-ar", "24000", "-ac", "1", outFile], { windowsHide: true })
-      let err = ""
-      child.stderr.on("data", (d) => (err += d.toString()))
-      child.on("error", reject)
-      child.on("close", async (code) => {
-        try {
-          if (code !== 0) return reject(new Error(`FFmpeg falhou ao converter áudio ElevenLabs: ${err.slice(-300)}`))
-          resolve(await readFile(outFile))
-        } finally {
-          await unlink(inFile).catch(() => {})
-          await unlink(outFile).catch(() => {})
-        }
-      })
-    } catch (e) {
-      await unlink(inFile).catch(() => {})
-      reject(e)
-    }
-  })
-}
-
-export async function generateElevenNarration({ key, text, voice }) {
+export async function generateElevenNarration({ key, text, voice, withTimestamps = false }) {
   if (!key) throw new Error("Configure a chave da ElevenLabs para gerar narração.")
   const voiceId = String(voice || ELEVEN_VOICES[0].id).trim()
-  const tryModel = async (model_id, inputText) => {
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
+
+  const callEndpoint = async (model_id, inputText, useTs) => {
+    const endpoint = useTs
+      ? `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/with-timestamps?output_format=mp3_44100_128`
+      : `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`
+    const res = await fetch(endpoint, {
       method: "POST",
-      headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
+      headers: {
+        "xi-api-key": key,
+        "Content-Type": "application/json",
+        Accept: useTs ? "application/json" : "audio/mpeg",
+      },
       body: JSON.stringify({
         text: inputText,
         model_id,
@@ -320,20 +297,41 @@ export async function generateElevenNarration({ key, text, voice }) {
       const msg = err?.detail?.message || `ElevenLabs HTTP ${res.status}`
       throw Object.assign(new Error(msg), { status: res.status })
     }
-    return Buffer.from(await res.arrayBuffer())
+    if (useTs) {
+      const json = await res.json()
+      return {
+        mp3: Buffer.from(json.audio_base64 || "", "base64"),
+        alignment: json.normalized_alignment || json.alignment || null,
+      }
+    }
+    return { mp3: Buffer.from(await res.arrayBuffer()), alignment: null }
   }
 
-  let mp3
-  try {
-    // eleven_v3 suporta nativamente tags de áudio como [whispers], [excited], [sighs], [laughs], [pauses]
-    mp3 = await tryModel("eleven_v3", text)
-  } catch (err) {
-    if (err.status === 400 || err.status === 404 || err.status === 422) {
-      const clean = String(text).replace(/\[[^\]]{1,32}\]\s*/g, "")
-      mp3 = await tryModel("eleven_multilingual_v2", clean)
-    } else {
-      throw err
+  let result = null
+  const attempts = withTimestamps
+    ? [
+        ["eleven_v3", text, true],
+        ["eleven_multilingual_v2", String(text).replace(/\[[^\]]{1,32}\]\s*/g, ""), true],
+        ["eleven_v3", text, false],
+        ["eleven_multilingual_v2", String(text).replace(/\[[^\]]{1,32}\]\s*/g, ""), false],
+      ]
+    : [
+        ["eleven_v3", text, false],
+        ["eleven_multilingual_v2", String(text).replace(/\[[^\]]{1,32}\]\s*/g, ""), false],
+      ]
+
+  let lastErr
+  for (const [model_id, inputText, useTs] of attempts) {
+    try {
+      result = await callEndpoint(model_id, inputText, useTs)
+      if (result.mp3?.length) break
+    } catch (err) {
+      lastErr = err
+      if (![400, 404, 422].includes(err.status)) throw err
     }
   }
-  return mp3BufferToWav(mp3)
+  if (!result?.mp3?.length) throw lastErr || new Error("ElevenLabs não retornou áudio.")
+  return withTimestamps
+    ? { audioBuffer: result.mp3, mimeType: "audio/mpeg", alignment: result.alignment }
+    : result.mp3
 }
