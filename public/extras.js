@@ -172,17 +172,17 @@ async function loadPublishList() {
     list.replaceChildren(
       ...(pubs.length
         ? pubs.map((r) => {
-            const d = el("div")
-            d.style.cssText = "padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"
-            d.append(
-              extLink(r.titulo || r.publishedTitle || r.publishedId, r.publishedUrl),
-              el("span", r.publishedViews != null ? `${numFmt.format(r.publishedViews)} views` : "Publicado", "chip up"),
-            )
-            return d
-          })
+          const d = el("div")
+          d.style.cssText = "padding:8px 10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"
+          d.append(
+            extLink(r.titulo || r.publishedTitle || r.publishedId, r.publishedUrl),
+            el("span", r.publishedViews != null ? `${numFmt.format(r.publishedViews)} views` : "Publicado", "chip up"),
+          )
+          return d
+        })
         : [el("p", "Nenhum roteiro vinculado a Short publicado ainda.", "meta")]),
     )
-  } catch {}
+  } catch { }
 }
 
 $("#btn-refresh-publicar")?.addEventListener("click", loadPublishList)
@@ -331,7 +331,7 @@ try {
     const clean = `${window.location.pathname}${qs.toString() ? `?${qs}` : ""}${window.location.hash}`
     history.replaceState(null, "", clean)
   }
-} catch {}
+} catch { }
 
 async function loadOAuthCard() {
   const badge = $("#oauth-conn-badge")

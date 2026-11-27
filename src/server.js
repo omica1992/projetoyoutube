@@ -16,6 +16,7 @@ import { buildTrendBrief } from "./trends.js"
 import { getYouTubeKey, getYouTubeKeyAsync, saveYouTubeKey, searchYouTube, verifyYouTubeKey, YouTubeApiError } from "./youtube.js"
 import { disconnectOAuth, exchangeCode, getAuthUrl, getOAuthStatus } from "./youtube-oauth.js"
 import { panelRoutes } from "./panel-routes.js"
+import { cartoonRoutes } from "./cartoon-routes.js"
 import { promptRoteiro } from "./prompts.js"
 import { transcribeAudio } from "./transcribe.js"
 import { audioDuration, buildChunks, buildTimeline } from "./timeline.js"
@@ -74,6 +75,7 @@ app.use("/p/:id", (req, res, next) => {
 })
 app.use("/p", express.static(DATA_DIR, { dotfiles: "deny" }))
 app.use("/api/painel", panelRoutes)
+app.use("/api/cartoon", cartoonRoutes())
 
 const upload = multer({
   dest: UPLOAD_DIR,

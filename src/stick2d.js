@@ -887,6 +887,6 @@ export async function renderStick2dVideo({ storyboard, words, audio, output, pre
     await encodeMp4({ framesDir, audioPath: audio, outFile: output })
     return storyboard
   } finally {
-    await fs.rm(stage, { recursive: true, force: true }).catch(() => {})
+    await fs.rm(stage, { recursive: true, force: true }).catch(() => { })
   }
 }
