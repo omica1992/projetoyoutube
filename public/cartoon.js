@@ -1,4 +1,4 @@
-import { createCartoonRenderer, recordCartoonVideo } from "/cartoon-engine.js?v=4"
+import { createCartoonRenderer, recordCartoonVideo } from "/cartoon-engine.js?v=5"
 
 const $ = (s, root = document) => root.querySelector(s)
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
@@ -130,7 +130,7 @@ function renderStoryboardCards(cenas, customAssets = {}) {
   const engine = createCartoonRenderer(270, 480)
   engine.setCustomAssets(customAssets || {})
   const html = cenas.map((c, idx) => {
-    const thumb = engine.renderThumbnailDataUrl(c, idx, customAssets)
+    const thumb = engine.renderThumbnailDataUrl(c, idx, customAssets, idx === cenas.length - 1)
     const opts = (arr, cur) => arr.map((v) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("")
     const castChecks = ["silas", "pedro", "maria", "joao"].map((id) =>
       `<label><input type="checkbox" data-cast="${idx}" value="${id}" ${(c.quemAparece || []).includes(id) ? "checked" : ""}>${id}</label>`

@@ -558,6 +558,7 @@ REGRAS DE QUALIDADE:
 - Escreva em português do Brasil PERFEITO, revise ortografia com rigor (nunca invente palavras).
 - Divida o roteiro em frases curtas (de 8 a 16 frases, cada frase vira uma cena visual clara).
 - Comece com um gancho impossível ou pergunta forte nos 2 primeiros segundos, tenha escalada e virada.
+- A ÚLTIMA frase do roteiro deve SEMPRE trazer um gancho final curioso convidando para seguir o canal, se inscrever e ativar o sininho (ex.: "Quer descobrir a próxima história impossível? Já segue o canal, se inscreve e ativa o sininho!").
 Retorne SOMENTE JSON válido: {"titulo":"Título curto e forte","frases":["frase 1","frase 2",...],"cenarioPrincipal":"oceano|vila|floresta|cidade|rio|estrada|espaco|praia|sala"}.`,
     })
     const parsed = parseJsonLoose(raw)

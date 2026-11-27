@@ -895,6 +895,193 @@ function buildBlueprintProp3D(THREE, toon, blueprint, hasFire, side = 1, cenario
   return { group: root, anims }
 }
 
+function drawRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.lineTo(x + w - r, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+  ctx.lineTo(x + w, y + h - r)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  ctx.lineTo(x + r, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+  ctx.lineTo(x, y + r)
+  ctx.quadraticCurveTo(x, y, x + r, y)
+  ctx.closePath()
+}
+
+function drawSubscribeCtaOverlay(ctx, W, H, localT) {
+  const enter = M.back(M.clamp(localT / 0.42, 0, 1))
+  const clickedSub = localT >= 1.05
+  const clickedBell = localT >= 1.55
+  const subPulse = clickedSub && localT < 1.32 ? 1 + Math.sin(((localT - 1.05) / 0.27) * Math.PI) * 0.09 : 1
+  const bellShake = clickedBell ? Math.sin((localT - 1.55) * 26) * Math.exp(-(localT - 1.55) * 1.4) * 0.32 : 0
+
+  const cardW = W * 0.84
+  const cardH = H * 0.128
+  const cardX = (W - cardW) / 2
+  const targetY = H * 0.825
+  const cardY = targetY + (1 - enter) * (H * 0.18)
+
+  ctx.save()
+  ctx.globalAlpha = M.clamp(localT / 0.2, 0, 1)
+
+  // Card escuro translúcido com contorno cartoon grosso
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, W * 0.036)
+  ctx.fillStyle = "rgba(15, 16, 22, 0.88)"
+  ctx.fill()
+  ctx.lineWidth = Math.max(4, W * 0.0065)
+  ctx.strokeStyle = "#0e0e14"
+  ctx.stroke()
+
+  // Cabeçalho "SIGA NOSSO CANAL"
+  const topFs = Math.round(W * 0.036)
+  ctx.font = `900 ${topFs}px Inter, "Segoe UI", Arial, sans-serif`
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  ctx.lineJoin = "round"
+  ctx.lineWidth = Math.round(topFs * 0.24)
+  ctx.strokeStyle = "#0e0e14"
+  ctx.fillStyle = "#ffffff"
+  ctx.strokeText("SIGA NOSSO CANAL", W / 2, cardY + cardH * 0.24)
+  ctx.fillText("SIGA NOSSO CANAL", W / 2, cardY + cardH * 0.24)
+
+  // Botão INSCREVA-SE / INSCRITO ✓
+  const btnW = cardW * 0.62
+  const btnH = cardH * 0.44
+  const btnCx = cardX + cardW * 0.39
+  const btnCy = cardY + cardH * 0.66
+  ctx.save()
+  ctx.translate(btnCx, btnCy)
+  ctx.scale(subPulse, subPulse)
+  drawRoundRect(ctx, -btnW / 2, -btnH / 2, btnW, btnH, btnH * 0.48)
+  ctx.fillStyle = clickedSub ? "#262a34" : "#ff1f3d"
+  ctx.fill()
+  ctx.lineWidth = Math.max(4, W * 0.0055)
+  ctx.strokeStyle = "#0e0e14"
+  ctx.stroke()
+
+  // Ícone play ou check verde
+  const iconX = -btnW * 0.33
+  if (clickedSub) {
+    ctx.strokeStyle = "#16d96a"
+    ctx.lineWidth = Math.max(5, W * 0.008)
+    ctx.lineCap = "round"
+    ctx.beginPath()
+    ctx.moveTo(iconX - W * 0.014, 0)
+    ctx.lineTo(iconX - W * 0.002, W * 0.014)
+    ctx.lineTo(iconX + W * 0.02, -W * 0.016)
+    ctx.stroke()
+  } else {
+    ctx.fillStyle = "#ffffff"
+    ctx.beginPath()
+    ctx.moveTo(iconX - W * 0.012, -W * 0.018)
+    ctx.lineTo(iconX + W * 0.02, 0)
+    ctx.lineTo(iconX - W * 0.012, W * 0.018)
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  const btnFs = Math.round(W * 0.042)
+  ctx.font = `900 ${btnFs}px Inter, "Segoe UI", Arial, sans-serif`
+  ctx.textAlign = "center"
+  ctx.textBaseline = "middle"
+  ctx.fillStyle = clickedSub ? "#86efac" : "#ffffff"
+  ctx.fillText(clickedSub ? "INSCRITO ✓" : "INSCREVA-SE", W * 0.03, 1)
+  ctx.restore()
+
+  // Partículas rápidas ao clicar em INSCREVA-SE
+  if (clickedSub && localT < 1.5) {
+    const p = (localT - 1.05) / 0.45
+    for (let k = 0; k < 8; k++) {
+      const ang = (k / 8) * Math.PI * 2
+      const rad = W * (0.04 + p * 0.09)
+      ctx.fillStyle = k % 2 ? "#ffd23f" : "#16d96a"
+      ctx.beginPath()
+      ctx.arc(btnCx + Math.cos(ang) * rad, btnCy + Math.sin(ang) * rad * 0.65, W * 0.009 * (1 - p), 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  // Botão do Sino ao lado
+  const bellCx = cardX + cardW * 0.83
+  const bellCy = btnCy
+  const bellR = btnH * 0.48
+  ctx.save()
+  ctx.translate(bellCx, bellCy)
+  ctx.beginPath()
+  ctx.arc(0, 0, bellR, 0, Math.PI * 2)
+  ctx.fillStyle = clickedBell ? "#ffd23f" : "#222530"
+  ctx.fill()
+  ctx.lineWidth = Math.max(4, W * 0.0055)
+  ctx.strokeStyle = "#0e0e14"
+  ctx.stroke()
+
+  ctx.rotate(bellShake)
+  const bs = bellR * 0.56
+  ctx.fillStyle = clickedBell ? "#18141c" : "#ffffff"
+  ctx.beginPath()
+  ctx.arc(0, -bs * 0.25, bs * 0.52, Math.PI, 0)
+  ctx.lineTo(bs * 0.66, bs * 0.52)
+  ctx.lineTo(-bs * 0.66, bs * 0.52)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(0, bs * 0.68, bs * 0.2, 0, Math.PI * 2)
+  ctx.fill()
+
+  // Ondas sonoras douradas quando o sino ativa
+  if (clickedBell) {
+    ctx.strokeStyle = "#ffd23f"
+    ctx.lineWidth = Math.max(3, W * 0.005)
+    ctx.lineCap = "round"
+    for (const s of [-1, 1]) {
+      ctx.beginPath()
+      ctx.arc(s * bellR * 0.95, 0, bellR * 0.35, s > 0 ? -0.7 : Math.PI - 0.7, s > 0 ? 0.7 : Math.PI + 0.7)
+      ctx.stroke()
+    }
+  }
+  ctx.restore()
+
+  // Cursor branco animado clicando em INSCREVA-SE e depois no Sino
+  if (localT >= 0.45 && localT <= 2.35) {
+    let curX = cardX + cardW * 0.75
+    let curY = cardY + cardH * 1.15
+    if (localT < 1.05) {
+      const u = M.smooth((localT - 0.45) / 0.55)
+      curX = curX + (btnCx + btnW * 0.12 - curX) * u
+      curY = curY + (btnCy + btnH * 0.15 - curY) * u
+    } else if (localT < 1.55) {
+      const u = M.smooth((localT - 1.15) / 0.38)
+      curX = (btnCx + btnW * 0.12) + (bellCx - (btnCx + btnW * 0.12)) * u
+      curY = (btnCy + btnH * 0.15) + (bellCy + bellR * 0.15 - (btnCy + btnH * 0.15)) * u
+    } else {
+      curX = bellCx
+      curY = bellCy + bellR * 0.15
+    }
+    const cs = W * 0.042
+    ctx.save()
+    ctx.translate(curX, curY)
+    ctx.fillStyle = "#ffffff"
+    ctx.strokeStyle = "#0e0e14"
+    ctx.lineWidth = Math.max(3, W * 0.005)
+    ctx.lineJoin = "round"
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(0, cs)
+    ctx.lineTo(cs * 0.32, cs * 0.76)
+    ctx.lineTo(cs * 0.52, cs * 1.12)
+    ctx.lineTo(cs * 0.68, cs * 1.04)
+    ctx.lineTo(cs * 0.48, cs * 0.68)
+    ctx.lineTo(cs * 0.82, cs * 0.68)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    ctx.restore()
+  }
+
+  ctx.restore()
+}
+
 function drawCaptionOverlay(ctx, W, H, captionGroup, extraText, flags = {}) {
   if (flags.stars) {
     ctx.save()
@@ -975,12 +1162,16 @@ function drawCaptionOverlay(ctx, W, H, captionGroup, extraText, flags = {}) {
     ctx.restore()
   }
 
+  if (flags.ctaFinal) {
+    drawSubscribeCtaOverlay(ctx, W, H, flags.sceneLocalT ?? 1.8)
+  }
+
   if (!captionGroup?.words?.length) return
   ctx.save()
   const baseFs = Math.round(W * 0.056)
   ctx.textBaseline = "middle"
   ctx.lineJoin = "round"
-  const y = H * 0.76
+  const y = flags.ctaFinal ? H * 0.71 : H * 0.76
   const upper = captionGroup.words.map((w) => w.toUpperCase())
   const gap = Math.round(baseFs * 0.36)
   const widths = upper.map((w, idx) => {
@@ -1318,6 +1509,8 @@ export function createCartoonRenderer(width = 540, height = 960) {
       lightning: sceneCfg.eventoCenario === "raio",
       lightningX: width * (0.28 + ((sceneIdx % 3) * 0.22)),
       stars: sceneCfg.eventoCenario === "estrelas",
+      ctaFinal: Boolean(opts.isLastScene || sceneCfg.ctaFinal),
+      sceneLocalT,
       t,
     }
     drawCaptionOverlay(ctx, width, height, showCaptions ? captionGroup : null, sceneCfg.textoTela, overlayFlags)
@@ -1332,10 +1525,10 @@ export function createCartoonRenderer(width = 540, height = 960) {
     preloadScenes(list = []) {
       for (const c of list) getWorld(c.cenario || "vila", c.luz || "dia")
     },
-    renderThumbnailDataUrl(sceneCfg, sceneIdx = 0, customAssets = null) {
+    renderThumbnailDataUrl(sceneCfg, sceneIdx = 0, customAssets = null, isLastScene = false) {
       const clean = (sceneCfg.texto || "").replace(/\[[^\]]{1,32}\]\s*/g, " ").trim()
       const words = clean.split(/\s+/).filter(Boolean).slice(0, 3)
-      renderFrame(sceneCfg, 0.4, words.length ? { words, active: 0 } : null, 0.4, true, { sceneIdx, speaking: true, customAssets: customAssets || customAssetsMap })
+      renderFrame(sceneCfg, 0.4, words.length ? { words, active: 0 } : null, isLastScene ? 1.8 : 0.4, true, { sceneIdx, speaking: true, customAssets: customAssets || customAssetsMap, isLastScene })
       return outCanvas.toDataURL("image/jpeg", 0.9)
     },
     renderCoverPngDataUrl(sceneCfg, hookText = "", customAssets = null) {
@@ -1403,7 +1596,7 @@ function computeSceneWindows(cenas, finalDuration, cenasTiming, palavras) {
   })
 }
 
-async function renderMixedOfflineAudio({ voiceBuf, bgBuf, whooshBuf, surpresaBuf, impactoBuf, popBuf, subidaBuf, cenas, sceneWindows, dropIdx, finalDuration }) {
+async function renderMixedOfflineAudio({ voiceBuf, bgBuf, whooshBuf, surpresaBuf, impactoBuf, popBuf, subidaBuf, cliqueBuf, dingBuf, cenas, sceneWindows, dropIdx, finalDuration }) {
   const sampleRate = 44100
   const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext
   const offline = new OfflineCtx(2, Math.max(sampleRate, Math.ceil(finalDuration * sampleRate)), sampleRate)
@@ -1451,6 +1644,10 @@ async function renderMixedOfflineAudio({ voiceBuf, bgBuf, whooshBuf, surpresaBuf
       playSfx(impactoBuf || surpresaBuf, startAt, 0.42)
       if (surpresaBuf && impactoBuf) playSfx(surpresaBuf, startAt + 0.06, 0.34)
     }
+    if (i === cenas.length - 1) {
+      if (cliqueBuf) playSfx(cliqueBuf, startAt + 1.05, 0.36)
+      if (dingBuf) playSfx(dingBuf, startAt + 1.55, 0.38)
+    }
   })
 
   return offline.startRendering()
@@ -1489,13 +1686,15 @@ export async function recordCartoonVideo({ cenas, palavras, cenasTiming, customA
 
   // Trilha curiosa (com Twist Music Drop antes da virada!) + suíte completa SFX (/sons/*.wav)
   const tryLoad = (u) => loadAudioBuffer(u).catch(() => null)
-  const [bgBuf, whooshBuf, surpresaBuf, impactoBuf, popBuf, subidaBuf] = await Promise.all([
+  const [bgBuf, whooshBuf, surpresaBuf, impactoBuf, popBuf, subidaBuf, cliqueBuf, dingBuf] = await Promise.all([
     tryLoad("/sons/trilha_curiosa.wav"),
     tryLoad("/sons/whoosh.wav"),
     tryLoad("/sons/surpresa.wav"),
     tryLoad("/sons/impacto.wav"),
     tryLoad("/sons/pop.wav"),
     tryLoad("/sons/subida.wav"),
+    tryLoad("/sons/clique.wav"),
+    tryLoad("/sons/ding.wav"),
   ])
 
   engine.preloadScenes(cenas)
@@ -1526,7 +1725,7 @@ export async function recordCartoonVideo({ cenas, palavras, cenasTiming, customA
         active: Math.max(0, posInPhrase) - gStart,
       }
     }
-    engine.renderFrame(cenas[idx], clampedT, captionGroup, sceneLocalT, showCaptions, { sceneIdx: idx, speaking: speakingNow })
+    engine.renderFrame(cenas[idx], clampedT, captionGroup, sceneLocalT, showCaptions, { sceneIdx: idx, speaking: speakingNow, isLastScene: idx === cenas.length - 1 })
   }
 
   // Caminho 1 (Preferencial): Exportação MP4 (H.264 + AAC) offline 30 fps cravados via mediabunny + WebCodecs
@@ -1539,7 +1738,7 @@ export async function recordCartoonVideo({ cenas, palavras, cenasTiming, customA
       ])
       if (canAvc && canAac) {
         const mixedAudio = await renderMixedOfflineAudio({
-          voiceBuf, bgBuf, whooshBuf, surpresaBuf, impactoBuf, popBuf, subidaBuf,
+          voiceBuf, bgBuf, whooshBuf, surpresaBuf, impactoBuf, popBuf, subidaBuf, cliqueBuf, dingBuf,
           cenas, sceneWindows, dropIdx, finalDuration,
         })
         const target = new mb.BufferTarget()
@@ -1664,6 +1863,10 @@ export async function recordCartoonVideo({ cenas, palavras, cenasTiming, customA
     if (i === dropIdx || cena.virada || cena.efeito === "flash") {
       playSfx(impactoBuf || surpresaBuf, startAt, 0.42)
       if (surpresaBuf && impactoBuf) playSfx(surpresaBuf, startAt + 0.06, 0.34)
+    }
+    if (i === cenas.length - 1) {
+      if (cliqueBuf) playSfx(cliqueBuf, startAt + 1.05, 0.36)
+      if (dingBuf) playSfx(dingBuf, startAt + 1.55, 0.38)
     }
   })
 
